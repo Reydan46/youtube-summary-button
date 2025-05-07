@@ -2,14 +2,26 @@
 // @name           [YTS] - Summary Button
 // @name:ru        [YTS] - Кнопка Обобщения
 // @name:en        [YTS] - Summary Button
-// @description    Кнопка для генерации структурированного текста или конспекта из субтитров YouTube-видео с помощью LLM (OpenAI совместимо).
-// @description:ru Кнопка для генерации структурированного текста или конспекта из субтитров YouTube-видео с помощью LLM (совместимо с OpenAI).
-// @description:en Button to generate structured summary/article from YouTube subtitles using LLM (OpenAI compatible).
-// @version        0.5.1
-// @author         LLM
+// @description    Button to generate a structured summary/article from YouTube subtitles using LLM models (OpenAI compatible). Extracts subtitles, sends them to a language model, streams and displays the summary, allows quick copy, prompt management, and supports multiple languages.
+// @description:ru Кнопка для генерации структурированного текста или конспекта из субтитров YouTube-видео с помощью LLM (совместимо с OpenAI). Извлекает субтитры, отправляет их в языковую модель, отображает краткое содержание, позволяет быстро скопировать, управлять шаблонами и поддерживает несколько языков.
+// @description:en Button to generate a structured summary/article from YouTube subtitles using LLM (OpenAI compatible). Extracts subtitles, sends to LLM, streams result, allows quick copy, prompt management, multi-language support.
+// @icon           https://www.youtube.com/s/desktop/0fbbf86e/img/favicon_144x144.png
+// @author         Reydan46
 // @namespace      yts
-// @match          https://*.youtube.com/*
+// @version        0.5.2
+// @homepageURL    https://github.com/Reydan46/youtube-summary-button
+// @supportURL     https://github.com/Reydan46/youtube-summary-button/issues
+// @updateURL      https://raw.githubusercontent.com/Reydan46/youtube-summary-button/main/yts.user.js
+// @downloadURL    https://raw.githubusercontent.com/Reydan46/youtube-summary-button/main/yts.user.js
 // @grant          GM_xmlhttpRequest
+// @grant          GM_setValue
+// @grant          GM_getValue
+// @grant          GM_addStyle
+// @match          https://*.youtube.com/*
+// @connect        api.openai.com
+// @connect        raw.githubusercontent.com
+// @connect        youtube.com
+// @connect        ytimg.com
 // @run-at         document-idle
 // ==/UserScript==
 
