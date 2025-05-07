@@ -15,7 +15,7 @@
 > Если вы пользуетесь Tampermonkey 5.2.0+, не забудьте [включить](https://github.com/ilyhalight/voice-over-translation/issues/662#issuecomment-2160768958) режим разработчика или используйте Tampermonkey MV2
 
 1. Установите расширение **[Tampermonkey](https://www.tampermonkey.net/)**   (Альтернатива для Safari: **[UserScripts](https://apps.apple.com/app/userscripts/id1463298887)**)
-2. **[«Установите Скрипт»](https://github.com/Reydan46/youtube-summary-button/raw/refs/heads/main/yts.user.js)**
+2. **[«Установите Скрипт»](https://raw.githubusercontent.com/Reydan46/youtube-summary-button/main/yts.user.js)**
 
 ---
 
