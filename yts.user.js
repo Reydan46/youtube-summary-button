@@ -764,7 +764,8 @@
                     const data = JSON.parse(match[1]);
                     const value = path.length ? path.reduce((o, k) => (o ? o[k] : undefined), data) : data;
                     if (value !== undefined && value !== null) return value;
-                } catch (e) {/*ignore*/}
+                } catch (e) {
+                }
             }
         }
         return null;
@@ -854,7 +855,7 @@
             if (Array.isArray(tracks) && tracks.length > 0) {
                 return tracks;
             }
-            const match = document.match(/"captionTracks":\s*\[(.*?)\](?:,|\})/s);
+            const match = document.body.innerHTML.match(/"captionTracks":\s*\[(.*?)]/s);
             if (!match) throw new Error('Субтитры не найдены для этого видео');
             try {
                 return JSON.parse(`[${match[1]}]`);
@@ -872,7 +873,7 @@
         const subtitleUrl = captionTrack.baseUrl;
 
         const subtitleXml = await (await fetch(subtitleUrl)).text();
-        const { subtitlesText, subtitlesFull } = extractTextFromSubtitleXml(subtitleXml);
+        const {subtitlesText, subtitlesFull} = extractTextFromSubtitleXml(subtitleXml);
         if (!subtitlesText)
             throw new Error('Не удалось извлечь текст из субтитров');
 
@@ -1007,7 +1008,11 @@
      * @param {number} y Y-координата
      */
     function showContextMenu(x, y) {
-        let menu = document.getElementById(CONTEXT_MENU_ID) || (createContextMenu(), document.getElementById(CONTEXT_MENU_ID));
+        let menu = document.getElementById(CONTEXT_MENU_ID);
+        if (!menu) {
+            createContextMenu();
+            menu = document.getElementById(CONTEXT_MENU_ID);
+        }
         menu.style.left = `${Math.round(x)}px`;
         menu.style.top = `${Math.round(y)}px`;
         menu.style.display = 'block';
@@ -1355,16 +1360,15 @@
                     const j = line.slice(6);
                     if (j === '[DONE]') continue;
                     let content = '';
+                    let d;
                     try {
-                        let d = JSON.parse(j);
-                        if (d?.error?.message) throw new Error(d.error.message);
-                        if (d?.detail) throw new Error(typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail));
-                        content = d.choices?.[0]?.delta?.content || '';
+                        d = JSON.parse(j);
                     } catch (err) {
-                        throw new Error(
-                            err.message || "Ошибка парсинга потока LLM: " + j
-                        );
+                        throw new Error("Ошибка парсинга потока - Некорректный JSON: " + j);
                     }
+                    if (d?.error?.message) throw new Error(d.error.message);
+                    if (d?.detail) throw new Error(typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail));
+                    content = d.choices?.[0]?.delta?.content || '';
                     if (content) await onDelta(content, false);
                 }
             }
@@ -1456,6 +1460,7 @@
         waitForElement(BTN_TARGET).then((buttonContainer) => {
             if (!buttonContainer) return;
             if (!q(`#${BTN_ID}`)) {
+                // noinspection JSUnusedGlobalSymbols
                 const summaryButton = createButton({
                     id: BTN_ID,
                     text: getActivePrompt().title || 'Генерировать',
