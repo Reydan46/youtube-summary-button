@@ -5,17 +5,14 @@
 // @description    Button to generate a structured summary/article from YouTube subtitles using LLM models (OpenAI compatible). Extracts subtitles, sends them to a language model, streams and displays the summary, allows quick copy, prompt management, and supports multiple languages.
 // @description:ru Кнопка для генерации структурированного текста или конспекта из субтитров YouTube-видео с помощью LLM (совместимо с OpenAI). Извлекает субтитры, отправляет их в языковую модель, отображает краткое содержание, позволяет быстро скопировать, управлять шаблонами и поддерживает несколько языков.
 // @description:en Button to generate a structured summary/article from YouTube subtitles using LLM (OpenAI compatible). Extracts subtitles, sends to LLM, streams result, allows quick copy, prompt management, multi-language support.
-// @icon           https://www.youtube.com/s/desktop/0fbbf86e/img/favicon_144x144.png
+// @icon           https://www.youtube.com/favicon.ico
 // @author         Reydan46
 // @namespace      yts
-// @version        0.5.2
+// @version        0.5.7
 // @homepageURL    https://github.com/Reydan46/youtube-summary-button
 // @supportURL     https://github.com/Reydan46/youtube-summary-button/issues
 // @updateURL      https://raw.githubusercontent.com/Reydan46/youtube-summary-button/main/yts.user.js
 // @downloadURL    https://raw.githubusercontent.com/Reydan46/youtube-summary-button/main/yts.user.js
-// @grant          GM_xmlhttpRequest
-// @grant          GM_setValue
-// @grant          GM_getValue
 // @grant          GM_addStyle
 // @match          https://*.youtube.com/*
 // @connect        api.openai.com
@@ -220,6 +217,118 @@
     }
 
     /**
+     * Создает видимую текстовую кнопку "youtube-стиля" (не через <button>, а через <yt-button>)
+     *
+     * @param {string} text Текст кнопки
+     * @param {string} className CSS класс
+     * @param {function} handler Обработчик клика
+     * @return {HTMLElement} Кнопка
+     */
+    function createTextButton(text, className, handler) {
+        const btn = document.createElement('span');
+        btn.className = 'yts-text-btn ' + (className || '');
+        btn.textContent = text;
+        btn.tabIndex = 0;
+        btn.role = "button";
+        btn.addEventListener('click', handler);
+        btn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                handler(e);
+                e.preventDefault();
+            }
+        });
+        return btn;
+    }
+
+    /**
+     * Добавляет кнопки "Свернуть"/"Развернуть" и реализует функциональность
+     *
+     * @param {HTMLElement} resultContainer Контейнер YTS_ResultContainer
+     */
+    function appendMinimizeButtons(resultContainer) {
+        if (!resultContainer || resultContainer.querySelector('.yts-min-btn')) return; // Уже есть
+
+        // Создаем кнопку "Свернуть"
+        const minBtn = createTextButton('Свернуть', 'yts-min-btn', () => {
+            minimizeResultContainer();
+        });
+        // Кнопка появляется в правом нижнем углу блока
+        minBtn.style.position = 'absolute';
+        minBtn.style.padding = '0';
+        minBtn.style.bottom = '12px';
+        minBtn.style.color = '#ababab';
+
+        resultContainer.appendChild(minBtn);
+        resultContainer.classList.add('yts-can-min');
+        resultContainer.style.position = 'relative';
+    }
+
+    /**
+     * Сворачивает блок результата, показывает кнопу "Развернуть"
+     */
+    function minimizeResultContainer() {
+        const resultContainer = document.getElementById(RESULT_CONTAINER_ID);
+        if (!resultContainer) return;
+
+        // Сохраняем высоту для анимации (если нужно)
+        resultContainer.classList.add('yts-minimized');
+        // Скрыть все кроме title-row
+        const children = Array.from(resultContainer.children);
+        for (let el of children) {
+            if (el.classList.contains('yts-title-row')) continue;
+            if (el.classList.contains('yts-min-btn')) {
+                el.style.display = 'none';
+                continue;
+            }
+            el.style.display = 'none';
+        }
+
+        // Показать кнопку "Развернуть"
+        if (!resultContainer.querySelector('.yts-more-btn')) {
+            const moreBtn = createTextButton('Развернуть', 'yts-more-btn', restoreResultContainer);
+            moreBtn.style.position = 'absolute';
+            moreBtn.style.padding = '0';
+            moreBtn.style.bottom = '12px';
+            moreBtn.style.color = '#ababab';
+            resultContainer.appendChild(moreBtn);
+        } else {
+            resultContainer.querySelector('.yts-more-btn').style.display = '';
+        }
+    }
+
+    /**
+     * Восстанавливает блок результата в полный вид, прячет "Развернуть", показывает "Свернуть"
+     */
+    function restoreResultContainer() {
+        const resultContainer = document.getElementById(RESULT_CONTAINER_ID);
+        if (!resultContainer) return;
+        resultContainer.classList.remove('yts-minimized');
+        // Показать все, кроме .yts-title-row и Развернуть
+        const children = Array.from(resultContainer.children);
+        for (let el of children) {
+            if (el.classList.contains('yts-min-btn')) {
+                el.style.display = '';
+                continue;
+            }
+            if (el.classList.contains('yts-more-btn')) {
+                el.style.display = 'none';
+                continue;
+            }
+            if (el.classList.contains('yts-title-row')) continue;
+            el.style.display = '';
+        }
+    }
+
+    const oldUpdateResultContentStream = updateResultContentStream;
+    updateResultContentStream = function (deltaText, isComplete) {
+        oldUpdateResultContentStream(deltaText, isComplete);
+        const container = document.getElementById(RESULT_CONTAINER_ID);
+        if (isComplete && container) {
+            setTimeout(() => appendMinimizeButtons(container), 10);
+        }
+    };
+
+    /**
      * Добавление блока кнопок копирования
      *
      * @param {HTMLElement} container Контейнер
@@ -303,7 +412,7 @@
      * @param {function} args.onClick Обработчик клика
      * @return {HTMLElement} DOM-элемент кнопки
      */
-    function createButtonIcon({ title = '', icon = '', onClick }) {
+    function createButtonIcon({title = '', icon = '', onClick}) {
         const btn = document.createElement('button');
         btn.type = "button";
         btn.className = 'yts-copy-btn';
@@ -350,7 +459,7 @@
      * @param {object} args id, text, onClick, onContextMenu
      * @return {HTMLElement} DOM-элемент
      */
-    function createButton({ id = '', text = '', onClick, onContextMenu }) {
+    function createButton({id = '', text = '', onClick, onContextMenu}) {
         const btn = document.createElement('button');
         if (id) btn.id = id;
         btn.textContent = text;
@@ -365,9 +474,7 @@
      */
     function injectStyles() {
         if (q('#yts-style')) return;
-        const style = document.createElement('style');
-        style.id = 'yts-style';
-        style.textContent = `
+        GM_addStyle(`
             #${BTN_ID}{
                 background-color:rgba(255,255,255,0.1);color:#f1f1f1;border:none;margin-left:8px;
                 padding:0 16px;border-radius:18px;font-size:14px;font-family:Roboto,Noto,sans-serif;font-weight:500;
@@ -376,7 +483,7 @@
             }
             #${BTN_ID}:hover{background-color:rgba(255,255,255,0.2);}
             #${RESULT_CONTAINER_ID}{
-                border-radius:12px;padding:16px;font-family:Roboto,Arial,sans-serif;color:#FFF;
+                border-radius:12px;padding:15px 15px 35px 15px;font-family:Roboto,Arial,sans-serif;color:#FFF;
                 box-sizing:border-box;background:var(--yt-spec-badge-chip-background,#222);
             }
             .yts-title-row{
@@ -425,6 +532,44 @@
 
             #${RESULT_CONTAINER_ID} .result-content{font-size:14px;line-height:1.4;white-space:pre-wrap;overflow-y:auto;max-height:320px;overscroll-behavior:contain;}
             #${RESULT_CONTAINER_ID} .result-error{color:#ff2929;font-weight:bold;margin-top:8px;font-size:14px;}
+            #${RESULT_CONTAINER_ID}.yts-can-min { position: relative; }
+            #${RESULT_CONTAINER_ID} .yts-text-btn {
+                background: none;
+                color: #3ea6ff;
+                border: none;
+                cursor: pointer;
+                font-size: 15px;
+                font-weight: 500;
+                padding: 2px 10px;
+                border-radius: 18px;
+                outline: none;
+                line-height: 1;
+                margin: 0;
+                user-select: none;
+                display: inline-block;
+                transition: background .13s;
+            }
+            #${RESULT_CONTAINER_ID}.yts-minimized {
+                min-height: 0 !important;
+                max-height: 80px;
+                overflow: hidden;
+                transition: max-height .18s;
+            }
+            #${RESULT_CONTAINER_ID}.yts-minimized .yts-title-row,
+            #${RESULT_CONTAINER_ID}.yts-minimized .yts-copy-btn-group {
+                display: flex !important;
+            }
+            #${RESULT_CONTAINER_ID}.yts-minimized .yts-title-row .result-title::after {
+                content: " (свёрнуто)";
+                color: #b9b9aa;
+                font-size: 12px;
+                margin-left: 4px;
+                font-weight: 500;
+                opacity: 0.8;
+            }
+            #${RESULT_CONTAINER_ID}:not(.yts-minimized) .yts-title-row .result-title::after {
+                content: "";
+            }
 
             #${MODAL_ID}{
                 display:none;position:fixed;z-index:999999;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7)
@@ -439,7 +584,7 @@
             #${MODAL_ID} .prompt-list-block{margin-bottom:5px;max-height:255px;overflow-y:auto;padding-right:5px;}
             #${MODAL_ID} .prompt-row{display:flex;align-items:center;gap:5px;margin-bottom:5px;}
             #${MODAL_ID} .prompt-input-title{width:140px;margin-bottom: auto !important;}
-            #${MODAL_ID} .prompt-input-prompt{flex:1 1 0%;resize:vertical;min-height:42px;max-height:160px;}
+            #${MODAL_ID} .prompt-input-prompt{flex:1 1 0%;resize:vertical;min-height:60px;max-height:160px;}
             #${MODAL_ID} .prompt-btn{border:none;background:#444;color:#fff;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:13px;min-width:24px;justify-content:center;}
             #${MODAL_ID} .prompt-btn:disabled{opacity:0.6;cursor:default;}
             #${MODAL_ID} .prompt-btn.add{background:#3077bb;display:flex;margin-left:auto;}
@@ -467,10 +612,10 @@
             #${CONTEXT_MENU_ID} .menu-item{padding:9px 20px 9px 14px;cursor:pointer;background:none;border-radius:3px;display:flex;align-items:center;}
             #${CONTEXT_MENU_ID} .menu-item:hover{background:#ffffff1a;}
             #${CONTEXT_MENU_ID} .menu-item.active{background:#2151ad;color:#fff;}
+            #${CONTEXT_MENU_ID} .menu-item.active:hover{background:#295cbf}
             #${CONTEXT_MENU_ID} .menu-item .mark{margin-left:0;min-width: 25px;text-align:center;}
             #${CONTEXT_MENU_ID} .menu-separator{height:1px;background:#42484c;width:95%;margin:4px auto;}
-        `;
-        document.head.appendChild(style);
+        `);
         log('Styles injected');
     }
 
@@ -498,19 +643,75 @@
     }
 
     /**
-     * Парсинг и извлечение субтитров из XML
+     * Преобразует число секунд в строку времени мм:сс.мс или чч:мм:сс.мс, если showHours=true
+     *
+     * @param {number|string} seconds Количество секунд
+     * @param {boolean} showHours Показывать ли часы в выводимой строке
+     * @return {string} Время в формате мм:сс.мс или чч:мм:сс.мс
+     */
+    function secondsToTimeString(seconds, showHours) {
+        /**
+         * Преобразует число секунд в строку времени
+         *
+         * @param seconds Количество секунд
+         * @param showHours Показывать ли часы
+         * @return Строка времени
+         */
+        seconds = parseFloat(seconds);
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        const ms = Math.round((seconds - Math.floor(seconds)) * 1000);
+        const main = [
+            m.toString().padStart(2, '0'),
+            s.toString().padStart(2, '0')
+        ].join(':') + '.' + ms.toString().padStart(3, '0');
+        return showHours
+            ? h.toString().padStart(2, '0') + ":" + main
+            : main;
+    }
+
+    /**
+     * Парсинг и извлечение субтитров из XML с возможностью включения таймкодов
      *
      * @param {string} xmlString XML-субтитры
-     * @return {string} Текст субтитров
+     * @param {boolean} [withTimestamps=true] Включать ли таймкоды-строку-шапку
+     * @return {string} Текст субтитров или строки с таймкодами
      */
-    function extractTextFromSubtitleXml(xmlString) {
+    function extractTextFromSubtitleXml(xmlString, withTimestamps = true) {
         log('Extract subtitles');
         const textMatches = xmlString.match(/<text[^>]*>(.*?)<\/text>/g);
         if (!textMatches) return "";
-        return textMatches.map(match => {
-            const content = match.replace(/<text[^>]*>/, "").replace(/<\/text>/, "");
-            return decodeHtmlEntities(content);
-        }).join(" ").trim();
+
+        if (!withTimestamps) {
+            return textMatches.map(match => {
+                const content = match.replace(/<text[^>]*>/, "").replace(/<\/text>/, "");
+                return decodeHtmlEntities(content);
+            }).join(" ").trim();
+        } else {
+            // Определяем, есть ли хотя бы один start >= 3600 — добавлять ли часы
+            let maxStart = 0;
+            const startRegex = /start="([\d.]+)"/g;
+            let startMatch;
+            while ((startMatch = startRegex.exec(xmlString)) !== null) {
+                const start = parseFloat(startMatch[1]);
+                if (start > maxStart) maxStart = start;
+            }
+            const showHours = maxStart >= 3600;
+
+            let result = "[start - dur] text\n";
+            const regex = /<text[^>]*start="([\d.]+)"[^>]*dur="([\d.]+)"[^>]*>(.*?)<\/text>/;
+            textMatches.forEach(match => {
+                const item = regex.exec(match.replace(/\n/g, ''));
+                if (item) {
+                    const start = parseFloat(item[1]);
+                    const dur = item[2];
+                    const text = decodeHtmlEntities(item[3]);
+                    result += `[${secondsToTimeString(start, showHours)} - ${dur}] ${text}\n`;
+                }
+            });
+            return result.trim();
+        }
     }
 
     /**
@@ -528,35 +729,96 @@
     }
 
     let lastSubtitlesForCopy = "";
-    let lastSummaryForCopy   = "";
+    let lastSummaryForCopy = "";
 
     /**
-     * Получить данные видео/субтитров
-     *
-     * @return {Promise<object>} Объект с данными видео и субтитров
+     * Получить данные видео/субтитров на основе window.ytInitialPlayerResponse
+
+     * @return {Promise<object>} Объект с данными видео, субтитров и дополнительной информацией
      */
     async function getVideoFullData() {
         log('getVideoFullData');
-        const videoId = new URLSearchParams(location.search).get('v');
-        if (!videoId) throw new Error('Не удалось получить ID видео');
-        const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-        const videoTitle = q('h1.ytd-video-primary-info-renderer')?.textContent?.trim() || '';
-        const channelName = q('#channel-name a')?.textContent?.trim() || '';
-        const publishDate = q('#info-strings yt-formatted-string')?.textContent?.trim() || '';
 
-        const html = await (await fetch(videoUrl)).text();
-        const match = html.match(/"captionTracks":\[(.*?)\]/);
-        if (!match) throw new Error('Субтитры не найдены для этого видео');
-        const captionTracks = JSON.parse(`[${match[1]}]`);
+        const NOT_DEFINED = 'не определено';
+
+        const playerResponse = window.ytInitialPlayerResponse;
+        if (!playerResponse) throw new Error('Данные о видео не найдены (window.ytInitialPlayerResponse == null)');
+
+        let videoId = playerResponse.videoDetails?.videoId
+            || (new URLSearchParams(location.search)).get('v')
+            || NOT_DEFINED;
+        const videoUrl = videoId !== NOT_DEFINED ? `https://www.youtube.com/watch?v=${videoId}` : NOT_DEFINED;
+
+        let videoTitle = playerResponse.videoDetails?.title
+            || playerResponse.microformat?.playerMicroformatRenderer?.title?.simpleText
+            || document.querySelector('h1.ytd-video-primary-info-renderer')?.textContent?.trim()
+            || NOT_DEFINED;
+
+        let channelName = playerResponse.videoDetails?.author
+            || playerResponse.microformat?.playerMicroformatRenderer?.ownerChannelName
+            || document.querySelector('#channel-name a')?.textContent?.trim()
+            || NOT_DEFINED;
+
+        let publishDate = playerResponse.microformat?.playerMicroformatRenderer?.publishDate
+            || playerResponse.microformat?.playerMicroformatRenderer?.uploadDate
+            || document.querySelector('#info-strings yt-formatted-string')?.textContent?.trim()
+            || NOT_DEFINED;
+
+        let lengthSeconds = playerResponse.videoDetails?.lengthSeconds
+            || NOT_DEFINED;
+
+        let shortDescription = playerResponse.videoDetails?.shortDescription
+            || playerResponse.microformat?.playerMicroformatRenderer?.description?.simpleText
+            || NOT_DEFINED;
+
+        let thumbnails = playerResponse.videoDetails?.thumbnail?.thumbnails
+            || playerResponse.microformat?.playerMicroformatRenderer?.thumbnail?.thumbnails
+            || [];
+        let thumbnailUrl = Array.isArray(thumbnails) && thumbnails.length > 0
+            ? thumbnails[thumbnails.length - 1].url
+            : NOT_DEFINED;
+
+        let category = playerResponse.microformat?.playerMicroformatRenderer?.category
+            || NOT_DEFINED;
+
+        const captionTracks =
+            playerResponse.captions?.playerCaptionsTracklistRenderer?.captionTracks
+            || [];
+
+        if (!Array.isArray(captionTracks) || captionTracks.length === 0)
+            throw new Error('Субтитры не найдены для этого видео');
+
         const langPref = ['ru', 'en'];
         let captionTrack = langPref.map(lc => captionTracks.find(t => t.languageCode === lc))
             .find(Boolean) || captionTracks[0];
-        if (!captionTrack?.baseUrl) throw new Error('Не удалось найти ссылку на субтитры');
+
+        if (!captionTrack?.baseUrl)
+            throw new Error('Не удалось найти ссылку на субтитры');
+
+        log('Subtitles URL', captionTrack.baseUrl);
+
         const subtitleXml = await (await fetch(captionTrack.baseUrl)).text();
         const subtitlesText = extractTextFromSubtitleXml(subtitleXml);
-        if (!subtitlesText) throw new Error('Не удалось извлечь текст из субтитров');
-        log('Video/subs collected', {videoId, channelName, publishDate});
-        return {videoId, videoUrl, videoTitle, channelName, publishDate, subtitlesText};
+        if (!subtitlesText)
+            throw new Error('Не удалось извлечь текст из субтитров');
+
+        log('Video data', {
+            videoId, videoUrl, videoTitle, channelName, publishDate,
+            subtitlesText, lengthSeconds, shortDescription, thumbnailUrl, category
+        });
+
+        return {
+            videoId,
+            videoUrl,
+            videoTitle,
+            channelName,
+            publishDate,
+            lengthSeconds,
+            shortDescription,
+            thumbnailUrl,
+            category,
+            subtitlesText
+        };
     }
 
     /**
@@ -932,130 +1194,6 @@
         return row;
     }
 
-    // === LLM streaming fetch (inject into context) ===
-    (function injectYTSFetchWithErrorCatching() {
-        if (window.hasRunYTSStreamFetcherEnhanced) return;
-        window.hasRunYTSStreamFetcherEnhanced = true;
-        const prevMark = window.hasRunYTSStreamFetcher;
-        if (prevMark) log('yts: переподключаем fetcher (улучшенная обработка ошибок)');
-
-        window.addEventListener('message', async function (e) {
-            if (!e.data || e.data.yts_action !== 'YTS_SUMMARY_STREAM_FETCH') return;
-            log('LLM streaming fetch start (enhanced)');
-            const {payload} = e.data;
-            try {
-                const resp = await fetch(payload.url, {method: 'POST', headers: payload.headers, body: payload.data});
-                if (!resp.body || !window.TextDecoder) {
-                    let errorMsg = 'No streaming support from fetch';
-                    window.postMessage({yts_stream_chunk: {error: errorMsg, isComplete: true}}, '*');
-                    return;
-                }
-                // если статус не 200
-                if (!resp.ok) {
-                    let errorMsg = `API error: HTTP status ${resp.status}`;
-                    try {
-                        const text = await resp.text();
-                        log('Stream non-200 status, body:', text);
-                        // Возможно JSON с error/detail
-                        if (text) {
-                            let info;
-                            try {
-                                info = JSON.parse(text);
-                            } catch {
-                            }
-                            if (info) {
-                                if (info.error?.message)
-                                    errorMsg = info.error.message;
-                                else if (info.detail)
-                                    if (typeof info.detail === 'string') {
-                                        errorMsg = info.detail;
-                                    } else if (
-                                        typeof info.detail === 'object' &&
-                                        info.detail?.error?.message
-                                    ) {
-                                        errorMsg = info.detail.error.message;
-                                    } else errorMsg = JSON.stringify(info.detail);
-                                else
-                                    errorMsg = JSON.stringify(info);
-                            } else errorMsg = text;
-                        }
-                    } catch {
-                    }
-                    window.postMessage({yts_stream_chunk: {error: errorMsg, isComplete: true}}, '*');
-                    return;
-                }
-                const reader = resp.body.getReader();
-                let decoder = new TextDecoder('utf-8'), buf = '';
-                let globalErrorBody = '';
-                while (true) {
-                    const {done, value} = await reader.read();
-                    if (done) break;
-                    buf += decoder.decode(value, {stream: true});
-                    let lineEnd;
-                    while ((lineEnd = buf.indexOf('\n')) >= 0) {
-                        const line = buf.slice(0, lineEnd).trim();
-                        buf = buf.slice(lineEnd + 1);
-                        if (!line) continue;
-                        if (line.startsWith('data: ')) {
-                            const j = line.slice(6);
-                            if (j === '[DONE]') continue;
-                            let content = '';
-                            try {
-                                let d = JSON.parse(j);
-                                // Возможна ошибка в потоке
-                                if (d?.error?.message) {
-                                    log('Stream server error', d.error);
-                                    window.postMessage({
-                                        yts_stream_chunk: {
-                                            error: d.error.message,
-                                            isComplete: true
-                                        }
-                                    }, '*');
-                                    return;
-                                }
-                                // Иногда detail
-                                if (d?.detail) {
-                                    log('Stream error (detail)', d.detail);
-                                    window.postMessage({yts_stream_chunk: {error: d.detail, isComplete: true}}, '*');
-                                    return;
-                                }
-                                content = d.choices?.[0]?.delta?.content || '';
-                            } catch (err) {
-                                // невалидный или неожиданный формат
-                                log('Streaming JSON parse error', {j, err});
-                                globalErrorBody += (j + '\n');
-                            }
-                            if (content) window.postMessage({
-                                yts_stream_chunk: {chunk: content, isComplete: false}
-                            }, '*');
-                        }
-                    }
-                }
-                if (globalErrorBody) {
-                    window.postMessage({
-                        yts_stream_chunk: {error: globalErrorBody, isComplete: true}
-                    }, '*');
-                    return;
-                }
-                window.postMessage({yts_stream_chunk: {chunk: '', isComplete: true}}, '*');
-            } catch (err) {
-                log('Streaming request JS catch error', err);
-                window.postMessage({yts_stream_chunk: {error: (err.message || err.toString()), isComplete: true}}, '*');
-            }
-        }, false);
-        log('Injected enhanced streamer');
-    })();
-
-    /**
-     * Запуск стрим-LLM запроса
-     *
-     * @param {object} payload Данные fetch
-     */
-    function runFetchInPage(payload) {
-        log('Trigger streaming fetch', payload);
-        window.postMessage({yts_action: 'YTS_SUMMARY_STREAM_FETCH', payload}, '*');
-    }
-
     /**
      * Стример обновления результата
      *
@@ -1095,25 +1233,80 @@
         }, 5);
     }
 
-    window.addEventListener('message', (event) => {
-        if (!event.data || !event.data.yts_stream_chunk) return;
-        const {chunk, isComplete, error} = event.data.yts_stream_chunk;
-        if (error) return showError(error);
-        updateResultContentStream(chunk, !!isComplete);
-    });
+    /**
+     * Выполняет LLM streaming fetch с помощью fetch, без инъектора
+
+     * @param {string} url URL эндпоинта
+     * @param {object} opts Опции запроса (headers, body, method)
+     * @param {function} onDelta Callback для каждой delta-строки (части)
+     * @return {Promise<void>} Промис для завершения передачи
+     */
+    async function streamFetchLLM(url, opts, onDelta) {
+        const resp = await fetch(url, opts);
+        if (!resp.body) throw new Error('Нет поддержки стриминга у fetch');
+        if (!resp.ok) {
+            let errorMsg = `API error: HTTP status ${resp.status}`;
+            try {
+                const text = await resp.text();
+                let info;
+                try {
+                    info = JSON.parse(text);
+                } catch {
+                }
+                if (info?.error?.message) errorMsg = info.error.message;
+                else if (typeof info?.detail === 'string') errorMsg = info.detail;
+                else if (info?.detail?.error?.message) errorMsg = info.detail.error.message;
+                else if (info?.detail) errorMsg = JSON.stringify(info.detail);
+                else if (info) errorMsg = JSON.stringify(info);
+                else if (text) errorMsg = text;
+            } catch {
+            }
+            throw new Error(errorMsg);
+        }
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buf = '';
+        while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, {stream: true});
+            let lineEnd;
+            while ((lineEnd = buf.indexOf('\n')) >= 0) {
+                const line = buf.slice(0, lineEnd).trim();
+                buf = buf.slice(lineEnd + 1);
+                if (!line) continue;
+                if (line.startsWith('data: ')) {
+                    const j = line.slice(6);
+                    if (j === '[DONE]') continue;
+                    let content = '';
+                    try {
+                        let d = JSON.parse(j);
+                        if (d?.error?.message) throw new Error(d.error.message);
+                        if (d?.detail) throw new Error(typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail));
+                        content = d.choices?.[0]?.delta?.content || '';
+                    } catch (err) {
+                        throw new Error(
+                            err.message || "Ошибка парсинга потока LLM: " + j
+                        );
+                    }
+                    if (content) await onDelta(content, false);
+                }
+            }
+        }
+        await onDelta('', true);
+    }
 
     /**
-     * Отправка запроса в LLM API
-     *
-     * @param {string} subtitles Субтитры
-     * @param {object} metadata Видео-данные
+     * Отправка запроса в LLM API, потоковой обработкой delta'ов
+
+     * @param {object} videoData Видео-данные
      * @return {Promise<any>} Промис результата
      */
-    function sendToAPI(subtitles, metadata) {
-        return new Promise((resolve, reject) => {
+    function sendToAPI(videoData) {
+        return new Promise(async (resolve, reject) => {
             const settings = loadSettings();
             const promptObj = settings.prompts.find(p => p.id === settings.activePromptId) || settings.prompts[0];
-            const prompt = (promptObj?.prompt || '') + subtitles;
+            const prompt = (promptObj?.prompt || '') + videoData.subtitlesText;
             const requestData = {
                 model: settings.model || "gpt-4.1-nano",
                 messages: [{role: "user", content: prompt}],
@@ -1127,34 +1320,35 @@
             }, TIMEOUT);
 
             let resolved = false;
-
-            function onStream(event) {
-                if (!event.data || !event.data.yts_stream_chunk) return;
-                const {chunk, isComplete, error} = event.data.yts_stream_chunk;
-                if (error && !resolved) {
+            try {
+                await streamFetchLLM(
+                    settings.url || DEFAULT_SETTINGS.url,
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": "Bearer " + (settings.token || ''),
+                            "Accept": "text/event-stream"
+                        },
+                        body: JSON.stringify(requestData)
+                    },
+                    (chunk, isComplete) => {
+                        updateResultContentStream(chunk, !!isComplete);
+                        if (isComplete && !resolved) {
+                            resolved = true;
+                            clearTimeout(timeoutId);
+                            resolve();
+                        }
+                    }
+                );
+            } catch (err) {
+                if (!resolved) {
                     resolved = true;
-                    window.removeEventListener('message', onStream);
                     clearTimeout(timeoutId);
-                    reject(new Error(error));
-                }
-                if (isComplete && !resolved) {
-                    resolved = true;
-                    window.removeEventListener('message', onStream);
-                    clearTimeout(timeoutId);
-                    resolve(chunk || '');
+                    showError(err.message || "Ошибка генерации ответа от LLM");
+                    reject(err);
                 }
             }
-
-            window.addEventListener('message', onStream);
-            runFetchInPage({
-                url: settings.url || DEFAULT_SETTINGS.url,
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": "Bearer " + (settings.token || ''),
-                    "Accept": "text/event-stream"
-                },
-                data: JSON.stringify(requestData)
-            });
         });
     }
 
@@ -1164,6 +1358,7 @@
      * @return {Promise<void>} Промис
      */
     async function performPromptedAction() {
+        restoreResultContainer();
         ytsErrorAlreadyShown = false;
         await createOrUpdateResultContainer(true);
         log('Action started');
@@ -1172,7 +1367,7 @@
             if (!videoData.subtitlesText || videoData.subtitlesText.length < 10)
                 return showError('Не удалось получить достаточно субтитров для этого видео');
             lastSubtitlesForCopy = videoData.subtitlesText;
-            await sendToAPI(videoData.subtitlesText, videoData);
+            await sendToAPI(videoData);
         } catch (error) {
             showError(error.message || 'Ошибка при обработке запроса');
         }
