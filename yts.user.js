@@ -8,7 +8,7 @@
 // @icon           https://www.youtube.com/favicon.ico
 // @author         Reydan46
 // @namespace      yts
-// @version        0.5.7
+// @version        0.6.0
 // @homepageURL    https://github.com/Reydan46/youtube-summary-button
 // @supportURL     https://github.com/Reydan46/youtube-summary-button/issues
 // @updateURL      https://raw.githubusercontent.com/Reydan46/youtube-summary-button/main/yts.user.js
@@ -86,7 +86,17 @@
         else console.log('[YTS]', msg);
     }
 
-    const q = (sel, context = document) => context.querySelector(sel);
+    /**
+     Функция для поиска первого элемента по селектору внутри заданного контекста
+
+     @param sel CSS-селектор
+     @param context Элемент-контекст для поиска (по умолчанию document)
+     @return Первый найденный элемент или null
+     */
+    const q = (sel, context = document) =>
+        (context instanceof Document || context instanceof Element)
+            ? context.querySelector(sel)
+            : null;
 
     /**
      * Декоратор-дебоунс
@@ -256,7 +266,7 @@
         minBtn.style.position = 'absolute';
         minBtn.style.padding = '0';
         minBtn.style.bottom = '12px';
-        minBtn.style.color = '#ababab';
+        minBtn.style.color = '#898989';
 
         resultContainer.appendChild(minBtn);
         resultContainer.classList.add('yts-can-min');
@@ -289,7 +299,7 @@
             moreBtn.style.position = 'absolute';
             moreBtn.style.padding = '0';
             moreBtn.style.bottom = '12px';
-            moreBtn.style.color = '#ababab';
+            moreBtn.style.color = '#898989';
             resultContainer.appendChild(moreBtn);
         } else {
             resultContainer.querySelector('.yts-more-btn').style.display = '';
@@ -415,7 +425,7 @@
     function createButtonIcon({title = '', icon = '', onClick}) {
         const btn = document.createElement('button');
         btn.type = "button";
-        btn.className = 'yts-copy-btn';
+        btn.className = 'yts-copy-btn yt-spec-button-shape-next--mono yt-spec-button-shape-next--tonal';
         btn.title = title;
         btn.innerText = icon;
         btn.addEventListener('click', onClick);
@@ -476,14 +486,13 @@
         if (q('#yts-style')) return;
         GM_addStyle(`
             #${BTN_ID}{
-                background-color:rgba(255,255,255,0.1);color:#f1f1f1;border:none;margin-left:8px;
+                border:none;margin-left:8px;
                 padding:0 16px;border-radius:18px;font-size:14px;font-family:Roboto,Noto,sans-serif;font-weight:500;
                 text-decoration:none;display:inline-flex;align-items:center;
                 height:36px;line-height:normal;cursor:pointer
             }
-            #${BTN_ID}:hover{background-color:rgba(255,255,255,0.2);}
             #${RESULT_CONTAINER_ID}{
-                border-radius:12px;padding:15px 15px 35px 15px;font-family:Roboto,Arial,sans-serif;color:#FFF;
+                border-radius:12px;padding:15px 15px 35px 15px;font-family:Roboto,Arial,sans-serif;
                 box-sizing:border-box;background:var(--yt-spec-badge-chip-background,#222);
             }
             .yts-title-row{
@@ -501,10 +510,8 @@
                 margin-left: auto;
             }
             .yts-copy-btn{
-                background-color:#ffffff17;
                 border:none;
                 border-radius:50%;
-                color:white;
                 cursor:pointer;
                 padding:5px 8px;
                 font-size:17px;
@@ -517,17 +524,11 @@
                 outline: none;
                 position: relative;
             }
-            .yts-copy-btn:hover{
-                background-color:#535353;
-                color:#f7dc58;
-            }
             .yts-copy-btn.yts-copy-success{
-                background-color: #366924 !important;
-                color: #fff700 !important;
+                background-color: #43ff004f !important;
             }
             .yts-copy-btn.yts-copy-failed{
-                background-color: #692424 !important;
-                color: #fff !important;
+                background-color: #ff00005e !important;
             }
 
             #${RESULT_CONTAINER_ID} .result-content{font-size:14px;line-height:1.4;white-space:pre-wrap;overflow-y:auto;max-height:320px;overscroll-behavior:contain;}
@@ -672,46 +673,53 @@
     }
 
     /**
-     * Парсинг и извлечение субтитров из XML с возможностью включения таймкодов
+     * Парсинг и одновременное извлечение субтитров из XML в двух форматах: полный с таймкодами и просто текст
      *
-     * @param {string} xmlString XML-субтитры
-     * @param {boolean} [withTimestamps=true] Включать ли таймкоды-строку-шапку
-     * @return {string} Текст субтитров или строки с таймкодами
+     * @param xmlString XML-субтитры
+     * @return {subtitlesFull: string, subtitlesText: string} Субтитры с таймкодами и только текст
      */
-    function extractTextFromSubtitleXml(xmlString, withTimestamps = true) {
+    function extractTextFromSubtitleXml(xmlString) {
         log('Extract subtitles');
         const textMatches = xmlString.match(/<text[^>]*>(.*?)<\/text>/g);
-        if (!textMatches) return "";
-
-        if (!withTimestamps) {
-            return textMatches.map(match => {
-                const content = match.replace(/<text[^>]*>/, "").replace(/<\/text>/, "");
-                return decodeHtmlEntities(content);
-            }).join(" ").trim();
-        } else {
-            // Определяем, есть ли хотя бы один start >= 3600 — добавлять ли часы
-            let maxStart = 0;
-            const startRegex = /start="([\d.]+)"/g;
-            let startMatch;
-            while ((startMatch = startRegex.exec(xmlString)) !== null) {
-                const start = parseFloat(startMatch[1]);
-                if (start > maxStart) maxStart = start;
-            }
-            const showHours = maxStart >= 3600;
-
-            let result = "[start - dur] text\n";
-            const regex = /<text[^>]*start="([\d.]+)"[^>]*dur="([\d.]+)"[^>]*>(.*?)<\/text>/;
-            textMatches.forEach(match => {
-                const item = regex.exec(match.replace(/\n/g, ''));
-                if (item) {
-                    const start = parseFloat(item[1]);
-                    const dur = item[2];
-                    const text = decodeHtmlEntities(item[3]);
-                    result += `[${secondsToTimeString(start, showHours)} - ${dur}] ${text}\n`;
-                }
-            });
-            return result.trim();
+        if (!textMatches) {
+            return {
+                subtitlesFull: "",
+                subtitlesText: ""
+            };
         }
+
+        // subtitlesText: только текст
+        const subtitlesText = textMatches.map(match => {
+            const content = match.replace(/<text[^>]*>/, "").replace(/<\/text>/, "");
+            return decodeHtmlEntities(content);
+        }).join(" ").trim();
+
+        // Для subtitlesFull: определяем, отображать ли часы
+        let maxStart = 0;
+        const startRegex = /start="([\d.]+)"/g;
+        let startMatch;
+        while ((startMatch = startRegex.exec(xmlString)) !== null) {
+            const start = parseFloat(startMatch[1]);
+            if (start > maxStart) maxStart = start;
+        }
+        const showHours = maxStart >= 3600;
+
+        let subtitlesFull = "[start - dur] text\n";
+        const regex = /<text[^>]*start="([\d.]+)"[^>]*dur="([\d.]+)"[^>]*>(.*?)<\/text>/;
+        textMatches.forEach(match => {
+            const item = regex.exec(match.replace(/\n/g, ''));
+            if (item) {
+                const start = parseFloat(item[1]);
+                const dur = item[2];
+                const text = decodeHtmlEntities(item[3]);
+                subtitlesFull += `[${secondsToTimeString(start, showHours)} - ${dur}] ${text}\n`;
+            }
+        });
+
+        return {
+            subtitlesFull: subtitlesFull.trim(),
+            subtitlesText: subtitlesText
+        };
     }
 
     /**
@@ -732,61 +740,128 @@
     let lastSummaryForCopy = "";
 
     /**
-     * Получить данные видео/субтитров на основе window.ytInitialPlayerResponse
+     * Извлечение JS-объекта из inline <script> на странице по выражению присваивания
 
+     * @param {string} varName Название переменной (например, "ytInitialPlayerResponse")
+     * @param {string[]} path Путь к вложенному объекту (например, ["captions", "playerCaptionsTracklistRenderer", "captionTracks"])
+     * @return {any|null} Найденный объект или null
+     */
+    function extractObjectFromScripts(varName, path = []) {
+        // 1. Попробуем window[varName]
+        let obj = window[varName];
+        if (obj && path.length) obj = path.reduce((o, k) => (o ? o[k] : undefined), obj);
+        if (obj !== undefined && obj !== null) return obj;
+
+        // 2. Парсим <script> в поисках varName = {...};
+        const scripts = Array.from(document.scripts);
+        for (const script of scripts) {
+            const text = script.textContent;
+            // match JS объект по varName или window.varName
+            const re = new RegExp(`${varName}\\s*=\\s*({[\\s\\S]+?});`);
+            const match = text.match(re);
+            if (match) {
+                try {
+                    const data = JSON.parse(match[1]);
+                    const value = path.length ? path.reduce((o, k) => (o ? o[k] : undefined), data) : data;
+                    if (value !== undefined && value !== null) return value;
+                } catch (e) {/*ignore*/}
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Получить данные видео/субтитров через парсинг HTML страницы (без window.ytInitialPlayerResponse)
+     *
      * @return {Promise<object>} Объект с данными видео, субтитров и дополнительной информацией
      */
     async function getVideoFullData() {
         log('getVideoFullData');
 
         const NOT_DEFINED = 'не определено';
+        const playerResponse = extractObjectFromScripts('ytInitialPlayerResponse');
+        if (!playerResponse) log('Данные о видео не найдены (ytInitialPlayerResponse == null)');
 
-        const playerResponse = window.ytInitialPlayerResponse;
-        if (!playerResponse) throw new Error('Данные о видео не найдены (window.ytInitialPlayerResponse == null)');
-
-        let videoId = playerResponse.videoDetails?.videoId
+        const videoId = playerResponse.videoDetails?.videoId
             || (new URLSearchParams(location.search)).get('v')
+            || q('meta[itemprop="identifier"]')?.getAttribute('content')?.trim()
             || NOT_DEFINED;
+
         const videoUrl = videoId !== NOT_DEFINED ? `https://www.youtube.com/watch?v=${videoId}` : NOT_DEFINED;
 
-        let videoTitle = playerResponse.videoDetails?.title
+        const title = playerResponse.videoDetails?.title
             || playerResponse.microformat?.playerMicroformatRenderer?.title?.simpleText
-            || document.querySelector('h1.ytd-video-primary-info-renderer')?.textContent?.trim()
+            || q('meta[name="title"]')?.getAttribute('content')?.trim()
             || NOT_DEFINED;
 
-        let channelName = playerResponse.videoDetails?.author
-            || playerResponse.microformat?.playerMicroformatRenderer?.ownerChannelName
-            || document.querySelector('#channel-name a')?.textContent?.trim()
+        const shortDescription =
+            q('meta[name="description"]')?.getAttribute('content')?.trim()
             || NOT_DEFINED;
 
-        let publishDate = playerResponse.microformat?.playerMicroformatRenderer?.publishDate
+        const keywords =
+            q('meta[name="keywords"]')?.getAttribute('content')?.trim()
+            || NOT_DEFINED;
+
+        const channelName = (() => {
+            const primary =
+                playerResponse?.videoDetails?.author
+                || playerResponse?.microformat?.playerMicroformatRenderer?.ownerChannelName;
+            if (primary) return primary;
+
+            const span_author = q('span[itemprop="author"]');
+            return span_author
+                ? q('link[itemprop="name"]', span_author)?.getAttribute('content')?.trim() || NOT_DEFINED
+                : NOT_DEFINED;
+        })();
+
+        const publishDate = playerResponse.microformat?.playerMicroformatRenderer?.publishDate
             || playerResponse.microformat?.playerMicroformatRenderer?.uploadDate
-            || document.querySelector('#info-strings yt-formatted-string')?.textContent?.trim()
+            || q('meta[itemprop="datePublished"]')?.getAttribute('content')?.trim()
             || NOT_DEFINED;
 
-        let lengthSeconds = playerResponse.videoDetails?.lengthSeconds
+        const lengthSeconds = (() => {
+            const primary = playerResponse?.videoDetails?.lengthSeconds;
+            if (primary) return primary;
+
+            const dur = q('meta[itemprop="duration"]')?.getAttribute('content');
+            if (!dur) return NOT_DEFINED;
+
+            const m = dur.match(/PT(?:(\d+)M)?(?:(\d+)S)?/);
+            if (!m) return NOT_DEFINED;
+
+            const min = m[1] ? parseInt(m[1]) : 0;
+            const sec = m[2] ? parseInt(m[2]) : 0;
+            return (min * 60 + sec).toString();
+        })();
+
+        const category = playerResponse.microformat?.playerMicroformatRenderer?.category
+            || q('meta[itemprop="genre"]')?.getAttribute('content')?.trim()
             || NOT_DEFINED;
 
-        let shortDescription = playerResponse.videoDetails?.shortDescription
-            || playerResponse.microformat?.playerMicroformatRenderer?.description?.simpleText
-            || NOT_DEFINED;
+        const thumbnailUrl = (() => {
+            const thumbnails = playerResponse?.videoDetails?.thumbnail?.thumbnails
+                || playerResponse?.microformat?.playerMicroformatRenderer?.thumbnail?.thumbnails
+                || [];
+            if (Array.isArray(thumbnails) && thumbnails.length > 0) {
+                return thumbnails[thumbnails.length - 1].url;
+            }
+            return q('meta[property="og:image"]')?.getAttribute('content')?.trim()
+                || NOT_DEFINED;
+        })();
 
-        let thumbnails = playerResponse.videoDetails?.thumbnail?.thumbnails
-            || playerResponse.microformat?.playerMicroformatRenderer?.thumbnail?.thumbnails
-            || [];
-        let thumbnailUrl = Array.isArray(thumbnails) && thumbnails.length > 0
-            ? thumbnails[thumbnails.length - 1].url
-            : NOT_DEFINED;
-
-        let category = playerResponse.microformat?.playerMicroformatRenderer?.category
-            || NOT_DEFINED;
-
-        const captionTracks =
-            playerResponse.captions?.playerCaptionsTracklistRenderer?.captionTracks
-            || [];
-
-        if (!Array.isArray(captionTracks) || captionTracks.length === 0)
-            throw new Error('Субтитры не найдены для этого видео');
+        const captionTracks = (() => {
+            const tracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+            if (Array.isArray(tracks) && tracks.length > 0) {
+                return tracks;
+            }
+            const match = document.match(/"captionTracks":\s*\[(.*?)\](?:,|\})/s);
+            if (!match) throw new Error('Субтитры не найдены для этого видео');
+            try {
+                return JSON.parse(`[${match[1]}]`);
+            } catch (e) {
+                throw new Error('Ошибка обработки данных субтитров');
+            }
+        })();
 
         const langPref = ['ru', 'en'];
         let captionTrack = langPref.map(lc => captionTracks.find(t => t.languageCode === lc))
@@ -794,31 +869,31 @@
 
         if (!captionTrack?.baseUrl)
             throw new Error('Не удалось найти ссылку на субтитры');
+        const subtitleUrl = captionTrack.baseUrl;
 
-        log('Subtitles URL', captionTrack.baseUrl);
-
-        const subtitleXml = await (await fetch(captionTrack.baseUrl)).text();
-        const subtitlesText = extractTextFromSubtitleXml(subtitleXml);
+        const subtitleXml = await (await fetch(subtitleUrl)).text();
+        const { subtitlesText, subtitlesFull } = extractTextFromSubtitleXml(subtitleXml);
         if (!subtitlesText)
             throw new Error('Не удалось извлечь текст из субтитров');
 
-        log('Video data', {
-            videoId, videoUrl, videoTitle, channelName, publishDate,
-            subtitlesText, lengthSeconds, shortDescription, thumbnailUrl, category
-        });
-
-        return {
+        let videoData = {
+            channelName,
             videoId,
             videoUrl,
-            videoTitle,
-            channelName,
+            title,
+            shortDescription,
+            keywords,
             publishDate,
             lengthSeconds,
-            shortDescription,
-            thumbnailUrl,
             category,
-            subtitlesText
+            thumbnailUrl,
+            subtitleUrl,
+            subtitlesText,
+            subtitlesFull
         };
+
+        log('Video data', videoData);
+        return videoData;
     }
 
     /**
@@ -835,6 +910,7 @@
         if (!container) {
             container = document.createElement('div');
             container.id = RESULT_CONTAINER_ID;
+            // container.className = 'bold yt-formatted-string';
             middleRowDiv.insertBefore(container, middleRowDiv.firstChild);
         }
         clearContainer(container);
@@ -1141,10 +1217,10 @@
         updatePromptDeleteButtons(block);
 
         // Остальные поля
-        q(`#yts-setting-timeout`).value = timeout || 180000;
-        q(`#yts-setting-url`).value = url || '';
-        q(`#yts-setting-token`).value = token || '';
-        q(`#yts-setting-model`).value = model || 'gpt-4.1-nano';
+        q(`#yts-setting-timeout`).value = timeout || DEFAULT_SETTINGS.timeout;
+        q(`#yts-setting-url`).value = url || DEFAULT_SETTINGS.url;
+        q(`#yts-setting-token`).value = token || DEFAULT_SETTINGS.token;
+        q(`#yts-setting-model`).value = model || DEFAULT_SETTINGS.model;
     }
 
     /**
@@ -1389,6 +1465,7 @@
                         showContextMenu(evt.clientX, evt.clientY);
                     }
                 });
+                summaryButton.className = 'yt-spec-button-shape-next--mono yt-spec-button-shape-next--tonal'
                 buttonContainer.appendChild(summaryButton);
                 log('Button added');
             }
