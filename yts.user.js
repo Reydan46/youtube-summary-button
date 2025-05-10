@@ -8,7 +8,7 @@
 // @icon           https://www.youtube.com/favicon.ico
 // @author         Reydan46
 // @namespace      yts
-// @version        0.8.0
+// @version        0.8.1
 // @homepageURL    https://github.com/Reydan46/youtube-summary-button
 // @supportURL     https://github.com/Reydan46/youtube-summary-button/issues
 // @updateURL      https://raw.githubusercontent.com/Reydan46/youtube-summary-button/main/yts.user.js
@@ -31,10 +31,11 @@
     if (window.self !== window.top) return;
 
     // === Константы и идентификаторы ===
-    const YTS_MODULE = "YTS";
+    const MODULE_NAME = "YTS";
     const STORAGE_KEY = 'yts-settings';
+    const TARGET_BUTTON_ELEMENT = "#owner";
+    const TARGET_RESULT_ELEMENT = "#middle-row";
     const BTN_ID = "YTS_GenBtn";
-    const BTN_TARGET = "#owner";
     const RESULT_CONTAINER_ID = "YTS_ResultContainer";
     const MODAL_ID = 'YTS_SettingsModal';
     const CONTEXT_MENU_ID = 'YTS_ContextMenu';
@@ -139,24 +140,40 @@ A: [Ответ]
     function injectStyles() {
         if (q('#yts-style')) return;
         GM_addStyle(`
-            #${BTN_ID}{
-                border:none;margin-left:8px;
-                padding:0 16px;border-radius:18px;font-size:14px;font-family:Roboto,Noto,sans-serif;font-weight:500;
-                text-decoration:none;display:inline-flex;align-items:center;
-                height:36px;line-height:normal;cursor:pointer
+            #${BTN_ID} {
+                border:none;
+                margin-left:8px;
+                padding:0 16px;
+                border-radius:18px;
+                font-size:14px;
+                font-family:Roboto,Noto,sans-serif;
+                font-weight:500;
+                text-decoration:none;
+                display:inline-flex;
+                align-items:center;
+                height:36px;
+                line-height:normal;
+                cursor:pointer
             }
-            #${RESULT_CONTAINER_ID}{
-                border-radius:12px;padding:15px 15px 35px 15px;font-family:Roboto,Arial,sans-serif;
-                box-sizing:border-box;background:var(--yt-spec-badge-chip-background,#222);
+            #${RESULT_CONTAINER_ID} {
+                position:relative;
+                border-radius:12px;
+                padding:15px 15px 35px 15px;
+                font-family:Roboto,Arial,sans-serif;
+                box-sizing:border-box;
+                background:var(--yt-spec-badge-chip-background,#222);
             }
-            .yts-title-row{
+            .yts-title-row {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
                 margin-bottom: 8px;
                 width: 100%;
             }
-            .result-title{font-size:18px;font-weight:600;}
+            .result-title {
+                font-size:18px;
+                font-weight:600;
+            }
             .yts-copy-btn-group{
                 display: flex;
                 gap: 4px;
@@ -182,9 +199,23 @@ A: [Ответ]
                 background-color: #43ff004f !important;
             }
 
-            #${RESULT_CONTAINER_ID} .result-content{font-size:14px;line-height:1.4;white-space:pre-wrap;overflow-y:auto;max-height:320px;overscroll-behavior:contain;}
-            #${RESULT_CONTAINER_ID} .result-error{color:#ff2929;font-weight:bold;margin-top:8px;font-size:14px;}
-            #${RESULT_CONTAINER_ID}.yts-can-min { position: relative; }
+            #${RESULT_CONTAINER_ID} .result-content {
+                font-size:14px;
+                line-height:1.4;
+                white-space:pre-wrap;
+                overflow-y:auto;
+                max-height:320px;
+                overscroll-behavior:contain;
+                }
+            #${RESULT_CONTAINER_ID} .result-error {
+                color:#ff2929;
+                font-weight:bold;
+                margin-top:8px;
+                font-size:14px;
+            }
+            #${RESULT_CONTAINER_ID}.yts-can-min {
+                position: relative;
+            }
             #${RESULT_CONTAINER_ID} .yts-text-btn {
                 background: none;
                 color: #3ea6ff;
@@ -238,82 +269,349 @@ A: [Ответ]
             }
     
             #${MODAL_ID} {
-                display:none;position:fixed;z-index:999999;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7)
+                display:none;
+                position:fixed;
+                z-index:999999;
+                left:0;
+                top:0;
+                width:100vw;
+                height:100vh;
+                background:rgba(0,0,0,0.7);
             }
             #${MODAL_ID} .modal-inner{
-                background:#2b2b2b;color:#f1f1f1;border-radius:12px;box-shadow:0 4px 38px 0 rgba(0,0,0,0.26);
-                position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:80vw;width:97vw;
-                padding:32px 24px 22px 24px;box-sizing:border-box;
+                background:#2b2b2b;
+                color:#f1f1f1;
+                border-radius:12px;
+                box-shadow:0 4px 38px 0 rgba(0,0,0,0.26);
+                position:absolute;
+                left:50%;
+                top:50%;
+                transform:translate(-50%,-50%);
+                max-width:80vw;
+                width:97vw;
+                padding:32px 24px 22px 24px;
+                box-sizing:border-box;
             }
-            #${MODAL_ID} .modal-title{font-size:23px;font-weight:600;margin-bottom:6px;color:#f1f1f1;letter-spacing:.01em;text-align:center;user-select:none;}
-            #${MODAL_ID} form{display:flex;flex-direction:column;align-items:stretch;width:100%;}
-            #${MODAL_ID} .prompt-list-block{margin-bottom:4px;max-height:55vh;overflow-y:auto;padding-right:5px;}
+            #${MODAL_ID} .modal-title {
+                font-size:23px;
+                font-weight:600;
+                margin-bottom:6px;
+                color:#f1f1f1;
+                letter-spacing:.01em;
+                text-align:center;
+                user-select:none;
+            }
+            #${MODAL_ID} form {
+                display:flex;
+                flex-direction:column;
+                align-items:stretch;
+                width:100%;
+            }
+            #${MODAL_ID} .prompt-list-block {
+                margin-bottom:4px;
+                max-height:55vh;
+                overflow-y:auto;
+                padding-right:5px;
+            }
             #${MODAL_ID} .prompt-list-header {
-                display:flex;align-items:center;justify-content:space-between;padding-bottom:2px;margin-bottom:3px;
-                position: sticky;top: 0px;background: #2b2b2b;z-index: 2;margin-right: -1px;
+                display:flex;
+                align-items:center;
+                justify-content:space-between;
+                padding-bottom:2px;
+                margin-bottom:3px;
+                position: sticky;
+                top: 0px;
+                background: #2b2b2b;
+                z-index: 2;
+                margin-right: -1px;
             }
-            #${MODAL_ID} .prompt-list-header .prompt-list-header-btns{display:flex;gap:6px;padding-right:1px;}
-            #${MODAL_ID} .prompt-list-header .prompt-list-header-title{
-                font-weight: bold;align-content: end;height: 31px;flex: 1;font-size: 14px;
+            #${MODAL_ID} .prompt-list-header .prompt-list-header-btns {
+                display:flex;
+                gap:6px;
+                padding-right:1px;
             }
-            #${MODAL_ID} .prompt-block-row{margin-bottom:15px;}
-            #${MODAL_ID} .prompt-row-1{margin-bottom:5px;}
-            #${MODAL_ID} .prompt-row{display:flex;align-items:center;gap:6px;}
-            #${MODAL_ID} .prompt-input-title{width:140px;margin-bottom: auto !important;flex:1 1 0%;}
-            #${MODAL_ID} .prompt-input-prompt{flex:1 1 0%;resize:vertical;min-height:60px;max-height:30vh;}
-            #${MODAL_ID} .prompt-btn{border:none;background:#ffffff45;color:#fff;padding:0;border-radius:4px;cursor:pointer;font-size:13px;min-width:24px;justify-content:center;width: 22px;height: 31px;align-items: center;}
-            #${MODAL_ID} .prompt-btn:hover{background: #ffffff26;}
-            #${MODAL_ID} .prompt-btn:disabled{opacity:0.6;cursor:default;}
-            #${MODAL_ID} .prompt-btn.add{background:#3077bb;display:flex;}
-            #${MODAL_ID} .prompt-btn.add:hover{background:#1d5993;}
-            #${MODAL_ID} .prompt-btn.remove{background:#d33535;}
-            #${MODAL_ID} .prompt-btn.remove:hover{background:#9f1919;}
-            #${MODAL_ID} .prompt-btn.remove:disabled{background:#3e3e3e;}
+            #${MODAL_ID} .prompt-list-header .prompt-list-header-title {
+                font-weight: bold;
+                align-content: end;
+                height: 31px;
+                flex: 1;
+                font-size: 14px;
+            }
+            #${MODAL_ID} .prompt-block-row {
+                margin-bottom:15px;
+            }
+            #${MODAL_ID} .prompt-row-1 {
+                margin-bottom:5px;
+            }
+            #${MODAL_ID} .prompt-row {
+                display:flex;
+                align-items:center;
+                gap:6px;
+            }
+            #${MODAL_ID} .prompt-input-title {
+                width:140px;
+                margin-bottom: auto !important;
+                flex:1 1 0%;
+            }
+            #${MODAL_ID} .prompt-input-prompt {
+                flex:1 1 0%;
+                resize:vertical;
+                min-height:60px;
+                max-height:30vh;
+            }
+            #${MODAL_ID} .prompt-btn {
+                border:none;
+                background:#ffffff45;
+                color:#fff;
+                padding:0;
+                border-radius:4px;
+                cursor:pointer;
+                font-size:13px;
+                min-width:24px;
+                justify-content:center;
+                width: 22px;
+                height: 31px;
+                align-items: center;
+            }
+            #${MODAL_ID} .prompt-btn:hover {
+                background: #ffffff26;}
+            #${MODAL_ID} .prompt-btn:disabled {
+                opacity:0.6;
+                cursor:default;
+            }
+            #${MODAL_ID} .prompt-btn.add {
+                background:#3077bb;
+                display:flex;
+            }
+            #${MODAL_ID} .prompt-btn.add:hover {
+                background:#1d5993;
+            }
+            #${MODAL_ID} .prompt-btn.remove {
+                background:#d33535;
+            }
+            #${MODAL_ID} .prompt-btn.remove:hover {
+                background:#9f1919;
+            }
+            #${MODAL_ID} .prompt-btn.remove:disabled {
+                background:#3e3e3e;
+            }
             #${MODAL_ID} .prompt-btn.check,
-            #${MODAL_ID} .prompt-btn.about{color:#191d23;font-weight:bold}
+            #${MODAL_ID} .prompt-btn.about {
+                color:#191d23;
+                font-weight:bold;
+            }
             #${MODAL_ID} .prompt-btn.check[disabled], 
-            #${MODAL_ID} .prompt-btn.about[disabled]{opacity:0.2;color:#ccc;cursor:default;}
-            #${MODAL_ID} label{margin-bottom:4px;font-weight:600;color:#cdcdcd;text-align:left;font-size:14px;display:block;align-content: center;}
+            #${MODAL_ID} .prompt-btn.about[disabled] {
+                opacity:0.2;
+                color:#ccc;
+                cursor:default;
+            }
+            #${MODAL_ID} label {
+                margin-bottom:4px;
+                font-weight:600;
+                color:#cdcdcd;
+                text-align:left;
+                font-size:14px;
+                display:block;
+                align-content: center;
+            }
             #${MODAL_ID} input[type="text"],
             #${MODAL_ID} input[type="number"],
-            #${MODAL_ID} input[type="password"]{
-                font-size:13px;padding:7px 9px 7px 9px;border-radius:4px;border:1px solid #4a4d4d;background:#252525;color:#f1f1f1;box-sizing:border-box;
+            #${MODAL_ID} input[type="password"] {
+                font-size:13px;
+                padding:7px 9px 7px 9px;
+                border-radius:4px;
+                border:1px solid #4a4d4d;
+                background:#252525;
+                color:#f1f1f1;
+                box-sizing:border-box;
             }
-            #${MODAL_ID} textarea{font-size:13px;padding:7px;border-radius:4px;border:1px solid #4a4d4d;background:#252525;color:#f1f1f1;box-sizing:border-box;}
-            #${MODAL_ID} textarea::-webkit-resizer {border:none;background:none;}
-            #${MODAL_ID} .modal-actions{display:flex;justify-content:space-between;gap:13px;margin-top:10px;width:100%;}
-            #${MODAL_ID} .modal-btn{padding:7px 21px;background:#4a4d4d;color:#f1f1f1;border:none;border-radius:5px;font-size:13px;font-weight:500;cursor:pointer;transition:background .18s;flex:1 1 0%;max-width:150px;user-select:none;}
-            #${MODAL_ID} .modal-btn:hover{background:#393b3b;}
-            #${MODAL_ID} .modal-btn.reset{background:#d33535;color:#fff;}
-            #${MODAL_ID} .modal-btn.reset:hover{background:#9f1919;}
-            #${MODAL_ID} .modal-close{position:absolute;top:15px;right:20px;font-size:40px;font-weight:bold;color:#636363;cursor:pointer;background:none;border:none;line-height:1;transition:color .16s;user-select:none;}
-            #${MODAL_ID} .modal-close:hover{color:#b1b1b1;}
+            #${MODAL_ID} textarea {
+                font-size:13px;
+                padding:7px;
+                border-radius:4px;
+                border:1px solid #4a4d4d;
+                background:#252525;
+                color:#f1f1f1;
+                box-sizing:border-box;
+            }
+            #${MODAL_ID} textarea::-webkit-resizer {
+                border:none;
+                background:none;
+            }
+            #${MODAL_ID} .modal-actions {
+                display:flex;
+                justify-content:space-between;
+                gap:13px;
+                margin-top:10px;
+                width:100%;
+            }
+            #${MODAL_ID} .modal-btn {
+                padding:7px 21px;
+                background:#4a4d4d;
+                color:#f1f1f1;
+                border:none;
+                border-radius:5px;
+                font-size:13px;
+                font-weight:500;
+                cursor:pointer;
+                transition:background .18s;
+                flex:1 1 0%;
+                max-width:150px;
+                user-select:none;
+            }
+            #${MODAL_ID} .modal-btn:hover {
+                background:#393b3b;
+                }
+            #${MODAL_ID} .modal-btn.reset {
+                background:#d33535;
+                color:#fff;
+            }
+            #${MODAL_ID} .modal-btn.reset:hover {
+                background:#9f1919;
+            }
+            #${MODAL_ID} .modal-close {
+                position:absolute;
+                top:15px;
+                right:20px;
+                font-size:40px;
+                font-weight:bold;
+                color:#636363;
+                cursor:pointer;
+                background:none;
+                border:none;
+                line-height:1;
+                transition:color .16s;
+                user-select:none;
+            }
+            #${MODAL_ID} .modal-close:hover {
+                color:#b1b1b1;
+            }
             #${MODAL_ID} input:focus,
-            #${MODAL_ID} textarea:focus{outline:none!important;border-color:#4a4d4d!important;}
-            #${CONTEXT_MENU_ID}{
-                position:fixed;z-index:999999;background:#373737;border-radius:5px;box-shadow:0 2px 18px 0 rgba(0,0,0,0.25);
-                padding:1px;display:none;min-width:140px;color:#f1f1f1;font-family:Roboto,Arial,sans-serif;font-size:14px;user-select:none}
-            #${CONTEXT_MENU_ID} .menu-item{padding:9px 20px 9px 14px;cursor:pointer;background:none;border-radius:3px;display:flex;align-items:center;}
-            #${CONTEXT_MENU_ID} .menu-item:hover{background:#ffffff1a;}
-            #${CONTEXT_MENU_ID} .menu-item.active{background:#2151ad;color:#fff;}
-            #${CONTEXT_MENU_ID} .menu-item.active:hover{background:#295cbf}
-            #${CONTEXT_MENU_ID} .menu-item .mark{margin-left:0;min-width: 25px;text-align:center;}
-            #${CONTEXT_MENU_ID} .menu-separator{height:1px;background:#42484c;width:95%;margin:4px auto;}
-            .timestamp-link{color:#53a6ff;text-decoration:none;cursor:pointer;font-weight:550;margin-right:5px;}
-            #${PROMPT_PREVIEW_MODAL_ID}{
-                display:none;position:fixed;z-index:999999;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.7)
+            #${MODAL_ID} textarea:focus {
+                outline:none!important;
+                border-color:#4a4d4d!important;
             }
-            #${PROMPT_PREVIEW_MODAL_ID} .modal-inner{
-                background:#2b2b2b;color:#f1f1f1;border-radius:12px;box-shadow:0 4px 38px 0 rgba(0,0,0,0.26);
-                position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);max-width:80vw;width:97vw;
-                padding:32px 24px 22px 24px;box-sizing:border-box;
+            #${CONTEXT_MENU_ID} {
+                position:fixed;
+                z-index:999999;
+                background:#373737;
+                border-radius:5px;
+                box-shadow:0 2px 18px 0 rgba(0,0,0,0.25);
+                padding:1px;
+                display:none;
+                min-width:140px;
+                color:#f1f1f1;
+                font-family:Roboto,Arial,sans-serif;
+                font-size:14px;
+                user-select:none;
             }
-            #${PROMPT_PREVIEW_MODAL_ID} .modal-title{font-size:23px;font-weight:600;margin-bottom:6px;color:#f1f1f1;letter-spacing:.01em;text-align:center;user-select:none;}
-            #${PROMPT_PREVIEW_MODAL_ID} textarea{font-size:13px;padding:7px;border-radius:4px;border:1px solid #4a4d4d;background:#252525;color:#f1f1f1;box-sizing:border-box;}
-            #${PROMPT_PREVIEW_MODAL_ID} textarea::-webkit-resizer {border:none;background:none;}
-            #${PROMPT_PREVIEW_MODAL_ID} textarea:focus{outline:none!important;border-color:#4a4d4d!important;}
-            #${PROMPT_PREVIEW_MODAL_ID} .modal-close{position:absolute;top:15px;right:20px;font-size:40px;font-weight:bold;color:#636363;cursor:pointer;background:none;border:none;line-height:1;transition:color .16s;user-select:none;}
-            #${PROMPT_PREVIEW_MODAL_ID} .modal-close:hover{color:#b1b1b1;}
+            #${CONTEXT_MENU_ID} .menu-item {
+                padding:9px 20px 9px 14px;
+                cursor:pointer;
+                background:none;
+                border-radius:3px;
+                display:flex;
+                align-items:center;
+            }
+            #${CONTEXT_MENU_ID} .menu-item:hover {
+                background:#ffffff1a;
+            }
+            #${CONTEXT_MENU_ID} .menu-item.active {
+                background:#2151ad;
+                color:#fff;
+            }
+            #${CONTEXT_MENU_ID} .menu-item.active:hover {
+                background:#295cbf
+            }
+            .menu-item .mark {
+                margin-left:0;
+                min-width: 25px;
+                text-align:center;
+                color: transparent;
+            }
+            .menu-item.active .mark {
+                color:#ffd700;
+            }
+            .menu-separator {
+                height:1px;
+                background:#42484c;
+                width:95%;
+                margin:4px auto;
+            }
+            .timestamp-link {
+                color:#53a6ff;
+                text-decoration:none;
+                cursor:pointer;
+                font-weight:550;
+                margin-right:5px;
+            }
+            #${PROMPT_PREVIEW_MODAL_ID} {
+                display:none;
+                position:fixed;
+                z-index:999999;
+                left:0;
+                top:0;
+                width:100vw;
+                height:100vh;
+                background:rgba(0,0,0,0.7);
+            }
+            #${PROMPT_PREVIEW_MODAL_ID} .modal-inner {
+                background:#2b2b2b;
+                color:#f1f1f1;
+                border-radius:12px;
+                box-shadow:0 4px 38px 0 rgba(0,0,0,0.26);
+                position:absolute;
+                left:50%;
+                top:50%;
+                transform:translate(-50%,-50%);
+                max-width:80vw;width:97vw;
+                padding:32px 24px 22px 24px;
+                box-sizing:border-box;
+            }
+            #${PROMPT_PREVIEW_MODAL_ID} .modal-title {
+                font-size:23px;
+                font-weight:600;
+                margin-bottom:6px;
+                color:#f1f1f1;
+                letter-spacing:.01em;
+                text-align:center;
+                user-select:none;
+            }
+            #${PROMPT_PREVIEW_MODAL_ID} textarea {
+                font-size:13px;
+                padding:7px;
+                border-radius:4px;
+                border:1px solid #4a4d4d;
+                background:#252525;
+                color:#f1f1f1;
+                box-sizing:border-box;
+            }
+            #${PROMPT_PREVIEW_MODAL_ID} textarea::-webkit-resizer {
+                border:none;
+                background:none;
+            }
+            #${PROMPT_PREVIEW_MODAL_ID} textarea:focus {
+                outline:none!important;
+                border-color:#4a4d4d!important;
+            }
+            #${PROMPT_PREVIEW_MODAL_ID} .modal-close {
+                position:absolute;
+                top:15px;
+                right:20px;
+                font-size:40px;
+                font-weight:bold;
+                color:#636363;
+                cursor:pointer;
+                background:none;
+                border:none;
+                line-height:1;
+                transition:color .16s;
+                ser-select:none;
+            }
+            #${PROMPT_PREVIEW_MODAL_ID} .modal-close:hover {
+            color:#b1b1b1;
+            }
             #${PROMPT_DOC_MODAL_ID}{
                 display:none;
                 position:fixed;
@@ -399,7 +697,8 @@ A: [Ответ]
                 margin: 7px 0 10px 0;
                 white-space: pre-wrap;
             }
-            #${PROMPT_DOC_MODAL_ID} ul, #${PROMPT_DOC_MODAL_ID} ol {
+            #${PROMPT_DOC_MODAL_ID} ul, 
+            #${PROMPT_DOC_MODAL_ID} ol {
                 margin-top: 4px;
                 margin-bottom: 6px;
                 padding-left: 20px;
@@ -410,7 +709,7 @@ A: [Ответ]
                 margin: 18px auto 12px auto;
                 width: 96%;
             }
-            #${PROMPT_DOC_MODAL_ID} table{
+            #${PROMPT_DOC_MODAL_ID} table {
                 width: 100%;
                 color: #edeed0;
                 background: none;
@@ -420,11 +719,16 @@ A: [Ответ]
                 border-collapse: collapse;
                 background: #202127;
                 color: #e7e7ef;
-                margin-bottom: 8px;
+                margin-bottom: 10px;
+                margin-top: 8px;
                 font-size: 14px;
                 border-radius: 8px;
                 box-shadow: 0 1px 7px 0 rgba(0,0,0,0.14);
                 overflow: hidden;
+            }
+            #${PROMPT_DOC_MODAL_ID} .yts-doc-table.examples {
+                margin-top: 5px;
+                width: 100%;
             }
             #${PROMPT_DOC_MODAL_ID} .yts-doc-table th {
                 background: #89898954;
@@ -454,33 +758,10 @@ A: [Ответ]
             #${PROMPT_DOC_MODAL_ID} .yts-doc-table.examples th {
                 background: #89898954;
             }
-    
-            /* Стиль для специализированной кнопки выбора модели */
-            .model-select-btn {
-                // background: #444;
-                // color: #fff;
-                // border: none;
-                // border-radius: 6px;
-                // font-size: 15px;
-                // padding: 6px 12px;
-                // min-width: 36px;
-                // min-height: 32px;
-                // margin-left: 3px;
-                // cursor: pointer;
-                // transition: background .18s, color .15s;
-                // outline: none;
-                // display: inline-flex;
-                // align-items: center;
-                // justify-content: center;
-                // font-family: inherit;
-            }
-            .model-select-btn:hover:enabled {
-                // background: #3077bb;
-                // color: #fff;
-            }
-            .model-select-btn:disabled {
-                // opacity: 0.5;
-                // cursor: not-allowed;
+            #yts-preview-textarea{
+                width: 100%;
+                min-height: 70vh;
+                font-family: inherit;
             }
             #model-select-modal {
                 display: flex;
@@ -641,8 +922,8 @@ A: [Ответ]
         const time = getFormattedTime();
         const functionName = getCallerFunctionName();
         const prefix = functionName
-            ? `[${time}] [${YTS_MODULE}] [${functionName}] ${message}`
-            : `[${time}] [${YTS_MODULE}] ${message}`;
+            ? `[${time}] [${MODULE_NAME}] [${functionName}] ${message}`
+            : `[${time}] [${MODULE_NAME}] ${message}`;
         if (console[type]) {
             console[type](prefix, ...args);
         } else {
@@ -843,14 +1124,9 @@ A: [Ответ]
             minimizeResultContainer();
             log('Result container minimized by user');
         });
-        minBtn.style.position = 'absolute';
-        minBtn.style.padding = '0';
-        minBtn.style.bottom = '12px';
-        minBtn.style.color = '#898989';
 
         resultContainer.appendChild(minBtn);
         resultContainer.classList.add('yts-can-min');
-        resultContainer.style.position = 'relative';
         log('Minimize button added to result container');
     }
 
@@ -874,10 +1150,6 @@ A: [Ответ]
 
         if (!resultContainer.querySelector('.yts-more-btn')) {
             const moreBtn = createTextButton('Развернуть', 'yts-more-btn', restoreResultContainer);
-            moreBtn.style.position = 'absolute';
-            moreBtn.style.padding = '0';
-            moreBtn.style.bottom = '12px';
-            moreBtn.style.color = '#898989';
             resultContainer.appendChild(moreBtn);
             log('Expand button added to minimized container');
         } else {
@@ -1371,16 +1643,16 @@ A: [Ответ]
      */
     async function createOrUpdateResultContainer(loading = true) {
         log('Creating/updating result container, loading state:', loading);
-        const middleRowDiv = await waitForElement('#middle-row');
-        if (!middleRowDiv) {
-            log('Middle row container not found!', null, 'error');
+        const targetElement = await waitForElement(TARGET_RESULT_ELEMENT);
+        if (!targetElement) {
+            log('Target element for result container not found!', null, 'error');
             return;
         }
         let container = document.getElementById(RESULT_CONTAINER_ID);
         if (!container) {
             container = document.createElement('div');
             container.id = RESULT_CONTAINER_ID;
-            middleRowDiv.insertBefore(container, middleRowDiv.firstChild);
+            targetElement.insertBefore(container, targetElement.firstChild);
             log('Result container inserted to page');
         }
         clearContainer(container);
@@ -1422,10 +1694,8 @@ A: [Ответ]
             mark.className = 'mark';
             if (p.id === settings.activePromptId) {
                 mark.textContent = '➤';
-                mark.style.color = '#ffd700';
             } else {
                 mark.textContent = ' ';
-                mark.style.color = 'transparent';
             }
 
             item.appendChild(mark);
@@ -1594,7 +1864,6 @@ A: [Ответ]
 
         modal = document.createElement('div');
         modal.id = 'model-select-modal';
-        modal.style.display = 'flex';
 
         const modalInner = document.createElement('div');
         modalInner.className = 'modal-inner';
@@ -1719,7 +1988,7 @@ A: [Ответ]
 
             const modelInput = document.createElement('input');
             modelInput.type = "text";
-            modelInput.placeholder = "gpt-4.1-nano";
+            modelInput.placeholder = "";
             modelInput.id = "yts-setting-model";
             modelInput.style.flex = "1 1 0%";
             modelRow.appendChild(modelInput);
@@ -1761,7 +2030,6 @@ A: [Ответ]
             });
             modelRow.appendChild(modelBtn);
 
-            // Кнопки действий
             const actions = document.createElement('div');
             actions.className = 'modal-actions';
             const btnReset = createButton({
@@ -1780,7 +2048,6 @@ A: [Ответ]
 
             form.appendChild(promptBlock);
 
-            // Добавляем группой все горизонтальные строки
             for (let r of settingRows) form.appendChild(r.row);
             form.appendChild(modelRow);
 
@@ -1856,11 +2123,9 @@ A: [Ответ]
             topBar.appendChild(title);
             topBar.appendChild(closeBtn);
 
-            // Контейнер контента со скроллом
             const modalContent = document.createElement('div');
             modalContent.className = 'modal-doc-content';
 
-            // === Блок-интро + инструкция ===
             const instruction = document.createElement('div');
             instruction.style.fontSize = '15px';
             instruction.style.marginBottom = '10px';
@@ -1977,8 +2242,6 @@ A: [Ответ]
 
             const opTable = document.createElement('table');
             opTable.className = 'yts-doc-table';
-            opTable.style.marginTop = '8px';
-            opTable.style.marginBottom = '10px';
 
             const trh = document.createElement('tr');
             const th1 = document.createElement('th');
@@ -2018,9 +2281,6 @@ A: [Ответ]
 
             const egTable = document.createElement('table');
             egTable.className = 'yts-doc-table examples';
-            egTable.style.marginTop = "5px";
-            egTable.style.marginBottom = "10px";
-            egTable.style.width = "100%";
 
             const eg_trh = document.createElement('tr');
             const eg_th1 = document.createElement('th');
@@ -2114,9 +2374,6 @@ A: [Ответ]
 
             textarea = document.createElement('textarea');
             textarea.id = 'yts-preview-textarea';
-            textarea.style.width = "100%";
-            textarea.style.minHeight = "70vh";
-            textarea.style.fontFamily = "inherit";
             textarea.readOnly = true;
 
             modalInner.append(closeBtn, title, textarea);
@@ -2182,13 +2439,16 @@ A: [Ответ]
         headerBtns.className = 'prompt-list-header-btns';
 
         const btnInfo = createButton({
-            text: "❓",
+            text: "?",
             onClick: () => {
                 showPromptDocsModal();
             }
         });
         btnInfo.type = 'button';
         btnInfo.className = 'prompt-btn about';
+        btnInfo.style.fontWeight = '700';
+        btnInfo.style.fontSize = '18px';
+        btnInfo.style.color = '#fff';
         btnInfo.title = 'Справка по плейсхолдерам и промптам';
         headerBtns.appendChild(btnInfo);
 
@@ -2803,7 +3063,7 @@ A: [Ответ]
      * Добавить кнопку действия на страницу (по умолчанию отключена до полной инициализации)
      */
     function addButton() {
-        waitForElement(BTN_TARGET).then((buttonContainer) => {
+        waitForElement(TARGET_BUTTON_ELEMENT).then((buttonContainer) => {
             if (!buttonContainer) {
                 log('Button container not found. Could not add main action button', null, 'warn');
                 return;
