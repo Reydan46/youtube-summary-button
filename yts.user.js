@@ -8,7 +8,7 @@
 // @icon           https://www.youtube.com/favicon.ico
 // @author         Reydan46
 // @namespace      yts
-// @version        0.8.1
+// @version        0.8.4
 // @homepageURL    https://github.com/Reydan46/youtube-summary-button
 // @supportURL     https://github.com/Reydan46/youtube-summary-button/issues
 // @updateURL      https://raw.githubusercontent.com/Reydan46/youtube-summary-button/main/yts.user.js
@@ -309,7 +309,7 @@ A: [Ответ]
             }
             #${MODAL_ID} .prompt-list-block {
                 margin-bottom:4px;
-                max-height:55vh;
+                max-height:549px;
                 overflow-y:auto;
                 padding-right:5px;
             }
@@ -317,8 +317,7 @@ A: [Ответ]
                 display:flex;
                 align-items:center;
                 justify-content:space-between;
-                padding-bottom:2px;
-                margin-bottom:3px;
+                padding-bottom:5px;
                 position: sticky;
                 top: 0px;
                 background: #2b2b2b;
@@ -464,11 +463,19 @@ A: [Ответ]
                 background:#393b3b;
                 }
             #${MODAL_ID} .modal-btn.reset {
-                background:#d33535;
+                background:#762c83;
                 color:#fff;
             }
             #${MODAL_ID} .modal-btn.reset:hover {
-                background:#9f1919;
+                background:#56215f;
+            }
+            #${MODAL_ID} .modal-btn.export,
+            #${MODAL_ID} .modal-btn.import{
+                background:#354069;
+            }
+            #${MODAL_ID} .modal-btn.export:hover,
+            #${MODAL_ID} .modal-btn.import:hover{
+                background:#293049;
             }
             #${MODAL_ID} .modal-close {
                 position:absolute;
@@ -847,6 +854,14 @@ A: [Ответ]
             #model-select-modal .yts-model-modal-option:hover {
                 background: #5db0ff29;
                 color: #42a3ff;
+            }
+            .modal-message-info {
+                display: none;
+                text-align: center;
+                margin-top: 10px;
+                border-radius: 5px;
+                padding: 5px;
+                font-size: 12px;
             }
         `);
     }
@@ -1808,7 +1823,7 @@ A: [Ответ]
          * :param apiToken: Bearer-токен
          * :return: Массив id моделей
          */
-        log('fetchLLMModels called', { apiUrl, apiToken });
+        log('fetchLLMModels called', {apiUrl, apiToken});
         let url = apiUrl;
         try {
             let m = url.match(/^https?:\/\/[^\/]+/);
@@ -1915,6 +1930,311 @@ A: [Ответ]
     }
 
     /**
+     Универсальное контекстное меню с пунктами действий
+
+     @param x X-координата
+     @param y Y-координата
+     @param items Массив пунктов меню [{label: "текст", onClick: функция}]
+     */
+    function showContextMenuUniversal(x, y, items) {
+        let menuId = 'YTS_UniMenu';
+        let oldMenu = document.getElementById(menuId);
+        if (oldMenu) oldMenu.remove();
+
+        const menu = document.createElement('div');
+        menu.id = menuId;
+        menu.style.position = 'fixed';
+        menu.style.zIndex = '1000001';
+        menu.style.background = '#373737';
+        menu.style.borderRadius = '5px';
+        menu.style.boxShadow = '0 2px 18px 0 rgba(0,0,0,0.25)';
+        menu.style.padding = '1px';
+        menu.style.color = '#f1f1f1';
+        menu.style.fontFamily = 'Roboto,Arial,sans-serif';
+        menu.style.fontSize = '14px';
+        menu.style.userSelect = 'none';
+        menu.style.minWidth = '170px';
+        menu.style.top = y + 'px';
+        menu.style.left = x + 'px';
+
+        items.forEach((item) => {
+            if (item === null) {
+                // Разделитель
+                const sep = document.createElement('div');
+                sep.className = 'menu-separator';
+                sep.style.height = '1px';
+                sep.style.background = '#42484c';
+                sep.style.width = '95%';
+                sep.style.margin = '4px auto';
+                menu.appendChild(sep);
+                return;
+            }
+            const el = document.createElement('div');
+            el.className = 'menu-item';
+            el.tabIndex = 0;
+            el.style.padding = '9px 20px 9px 14px';
+            el.style.cursor = 'pointer';
+            el.style.borderRadius = '3px';
+            el.style.display = "flex";
+            el.style.alignItems = "center";
+            el.textContent = item.label;
+            el.addEventListener('mouseenter', () => el.style.background = '#2151ad');
+            el.addEventListener('mouseleave', () => el.style.background = 'none');
+            el.addEventListener('click', () => {
+                menu.remove();
+                item.onClick?.();
+            });
+            menu.appendChild(el);
+        });
+
+        document.body.appendChild(menu);
+
+        function hide(event) {
+            if (event && menu.contains(event.target)) return;
+            menu.remove();
+            document.removeEventListener('mousedown', hide, {capture: true});
+            document.removeEventListener('scroll', hide, {capture: true});
+        }
+
+        setTimeout(() => {
+            document.addEventListener('mousedown', hide, {capture: true});
+            document.addEventListener('scroll', hide, {capture: true});
+        }, 10);
+    }
+
+    /**
+     Сохранить объект в файл JSON
+
+     :param data: Данные для сохранения
+     :param fileName: Имя файла
+     */
+    function saveJSONToFile(data, fileName) {
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName || "export.json";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            a.remove();
+            URL.revokeObjectURL(a.href);
+        }, 120);
+    }
+
+    /**
+     Импортировать настройки из выбранного файла с уникализацией промптов
+
+     @param onImport Функция (data:Object) для загрузки настроек
+     */
+    function importFromFile(onImport) {
+        const input = document.createElement('input');
+        input.type = "file";
+        input.accept = ".json,application/json";
+        input.style.display = "none";
+        input.addEventListener('change', function () {
+            if (input.files && input.files.length > 0) {
+                const file = input.files[0];
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    try {
+                        let raw = e.target.result;
+                        if (raw instanceof ArrayBuffer) {
+                            raw = new TextDecoder().decode(raw);
+                        }
+                        let imported;
+                        try {
+                            imported = JSON.parse(raw);
+                        } catch (err) {
+                            alert("Ошибка разбора JSON файла: " + err);
+                            return;
+                        }
+
+                        // Оставляем только ключи из DEFAULT_SETTINGS
+                        const cleanImported = {};
+                        Object.keys(DEFAULT_SETTINGS).forEach(k => {
+                            if (imported[k] != null) cleanImported[k] = imported[k];
+                        });
+
+                        // Получаем текущие настройки
+                        let settings = loadSettings();
+                        let merged = {...settings};
+
+                        // Обрабатываем prompts
+                        if (Array.isArray(cleanImported.prompts)) {
+                            const currentPrompts = Array.isArray(settings.prompts) ? settings.prompts : [];
+                            // Карта для проверки существующих prompt и title
+                            const existingPromptsMap = new Map();
+                            const existingTitlesCount = {};
+
+                            // Собираем уже существующие prompt и title
+                            currentPrompts.forEach(p => {
+                                existingPromptsMap.set((p.prompt || '').trim(), true);
+                                const t = (p.title || '').trim();
+                                if (t) {
+                                    if (!existingTitlesCount[t]) existingTitlesCount[t] = 1;
+                                    else existingTitlesCount[t]++;
+                                }
+                            });
+
+                            // Уникализируем и добавляем новые промпты
+                            const promptsToAdd = [];
+                            cleanImported.prompts.forEach(newPr => {
+                                const basePrompt = (newPr.prompt || '').trim();
+                                const baseTitle = (newPr.title || '').trim();
+
+                                // Проверяем duplicate prompt
+                                if (existingPromptsMap.has(basePrompt)) return;
+
+                                // Проверяем duplicate title и уникализируем
+                                let title = baseTitle;
+                                let num = (existingTitlesCount[title] || 0) + 1;
+                                while (currentPrompts.concat(promptsToAdd).some(p => (p.title || '').trim() === title)) {
+                                    title = baseTitle + "_" + num;
+                                    num++;
+                                }
+                                existingTitlesCount[baseTitle] = (existingTitlesCount[baseTitle] || 0) + 1;
+
+                                promptsToAdd.push({
+                                    ...newPr,
+                                    id: 'p_' + Math.random().toString(36).slice(2, 12) + "_" + Date.now(),
+                                    title: title
+                                });
+                                existingPromptsMap.set(basePrompt, true);
+                            });
+
+                            merged.prompts = [...currentPrompts, ...promptsToAdd];
+                        }
+
+                        // Остальные настройки, кроме prompts
+                        Object.keys(DEFAULT_SETTINGS).forEach(k => {
+                            if (k !== 'prompts' && cleanImported[k] != null) {
+                                merged[k] = cleanImported[k];
+                            }
+                        });
+
+                        // Автоматически обновляем форму настроек
+                        setTimeout(() => onImport(merged), 10);
+
+                    } catch (err) {
+                        alert("Ошибка импорта настроек: " + err);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+        document.body.appendChild(input);
+        input.click();
+        setTimeout(() => input.remove(), 5000);
+    }
+
+    /**
+     Создаёт строку с кнопками сброса, экспорта и импорта для настроек.
+     Сохраняет и обновляет настройки сразу после изменений.
+
+     :param formActionsRow: DOM-элемент строки для размещения кнопок (например, actions или отдельный div)
+     :param setSettingsForm: Функция для отображения новых настроек в форме
+     */
+    function addSettingsUtilityButtons(formActionsRow, setSettingsForm) {
+        const btnReset = createButton({
+            text: 'Сброс ...',
+            onClick: function (e) {
+                e.preventDefault();
+                const rect = btnReset.getBoundingClientRect();
+                showContextMenuUniversal(
+                    rect.left, rect.bottom,
+                    [
+                        {
+                            label: 'Сбросить промпты',
+                            onClick: () => {
+                                log('Settings modal: reset PROMPTS');
+                                const last = loadSettings();
+                                const newSettings = {
+                                    ...last,
+                                    prompts: DEFAULT_PROMPTS
+                                };
+                                setSettingsForm(newSettings);
+                            }
+                        },
+                        {
+                            label: 'Сбросить остальные настройки',
+                            onClick: () => {
+                                log('Settings modal: reset PREFS');
+                                const last = loadSettings();
+                                const newSettings = {
+                                    ...DEFAULT_SETTINGS,
+                                    prompts: last.prompts
+                                };
+                                setSettingsForm(newSettings);
+                            }
+                        },
+                        null,
+                        {
+                            label: 'Сбросить всё',
+                            onClick: () => {
+                                log('Settings modal: reset ALL');
+                                setSettingsForm(DEFAULT_SETTINGS);
+                            }
+                        }
+                    ]
+                );
+            }
+        });
+        btnReset.className = 'modal-btn reset';
+        formActionsRow.appendChild(btnReset);
+
+        const btnExport = createButton({
+            text: 'Экспорт ...',
+            onClick: function (e) {
+                e.preventDefault();
+                const rect = btnExport.getBoundingClientRect();
+                const settings = loadSettings();
+                const prompts = Array.isArray(settings.prompts) ? settings.prompts : [];
+                const prefs = {};
+                Object.keys(DEFAULT_SETTINGS).forEach(k => {
+                    if (k !== 'prompts') prefs[k] = settings[k];
+                });
+                showContextMenuUniversal(rect.left, rect.bottom, [
+                    {
+                        label: 'Экспорт промптов',
+                        onClick: () => {
+                            saveJSONToFile({prompts}, 'yts_prompts.json');
+                        }
+                    },
+                    {
+                        label: 'Экспорт настроек',
+                        onClick: () => {
+                            saveJSONToFile(prefs, 'yts_settings.json');
+                        }
+                    },
+                    null,
+                    {
+                        label: 'Экспорт всего',
+                        onClick: () => {
+                            saveJSONToFile(settings, 'yts_full_export.json');
+                        }
+                    }
+                ]);
+            }
+        });
+        btnExport.className = 'modal-btn export';
+        formActionsRow.appendChild(btnExport);
+
+        const btnImport = createButton({
+            text: 'Импорт',
+            onClick: function () {
+                importFromFile(setSettingsForm);
+            }
+        });
+        btnImport.className = 'modal-btn import';
+        formActionsRow.appendChild(btnImport);
+
+        const btnSave = createButton({text: 'Сохранить'});
+        btnSave.className = 'modal-btn save';
+        btnSave.type = 'submit';
+        formActionsRow.appendChild(btnSave);
+    }
+
+    /**
      * Модальное окно настроек
      */
     function showSettingsModal() {
@@ -1966,13 +2286,16 @@ A: [Ответ]
                 for (let k in inputProps) input[k] = inputProps[k];
                 row.appendChild(input);
 
-                return { row, input, label };
+                return {row, input, label};
             }
 
             const settingRows = [];
             settingRows.push(makeRow('API URL (LLM):', 'yts-setting-url', 'text', '', {}));
-            settingRows.push(makeRow('Bearer-токен (для API):', 'yts-setting-token', 'password', '', { autocomplete: 'off' }));
-            settingRows.push(makeRow('Таймаут ответа (мс):', 'yts-setting-timeout', 'number', '', { min: 10000, step: 1000 }));
+            settingRows.push(makeRow('Bearer-токен (для API):', 'yts-setting-token', 'password', '', {autocomplete: 'off'}));
+            settingRows.push(makeRow('Таймаут ответа (мс):', 'yts-setting-timeout', 'number', '', {
+                min: 10000,
+                step: 1000
+            }));
 
             const modelRow = document.createElement('div');
             modelRow.style.display = "flex";
@@ -2032,19 +2355,8 @@ A: [Ответ]
 
             const actions = document.createElement('div');
             actions.className = 'modal-actions';
-            const btnReset = createButton({
-                text: 'Сброс', onClick: () => {
-                    log('Settings modal: user clicked reset');
-                    setSettingsForm(DEFAULT_SETTINGS);
-                }
-            });
-            btnReset.className = 'modal-btn reset';
-            const btnSave = createButton({ text: 'Сохранить' });
-            btnSave.className = 'modal-btn';
-            btnSave.type = 'submit';
 
-            actions.appendChild(btnReset);
-            actions.appendChild(btnSave);
+            addSettingsUtilityButtons(actions, setSettingsForm);
 
             form.appendChild(promptBlock);
 
@@ -2061,7 +2373,7 @@ A: [Ответ]
                     const id = row.dataset.id || genPromptId();
                     const t = row.querySelector('.prompt-input-title').value.trim();
                     const p = row.querySelector('.prompt-input-prompt').value;
-                    if (t && p) prompts.push({ id, title: t, prompt: p });
+                    if (t && p) prompts.push({id, title: t, prompt: p});
                 }
                 let settings = loadSettings();
                 let newActive = settings.activePromptId;
@@ -2078,7 +2390,11 @@ A: [Ответ]
                 setTimeout(updateUIAfterPromptChange, 50);
             };
 
-            modalInner.append(closeBtn, title, form);
+
+            const messageInfo = document.createElement('div');
+            messageInfo.className = 'modal-message-info';
+
+            modalInner.append(closeBtn, title, form, messageInfo);
             modal.appendChild(modalInner);
             document.body.appendChild(modal);
             log('Settings modal created');
@@ -2133,7 +2449,7 @@ A: [Ответ]
 
             const intro1 = document.createElement('p');
             intro1.textContent =
-                'Промпт — это шаблон для LLM (ChatGPT/Sber и др.), ' +
+                'Промпт — это шаблон для LLM (ChatGPT/Claude и др.), ' +
                 'где вы используете специальные переменные (плейсхолдеры) для подстановки реальных данных о видео: субтитров, заголовка, описания и других метаданных.';
 
             const instructionsList = document.createElement('ul');
@@ -2416,6 +2732,127 @@ A: [Ответ]
     }
 
     /**
+     * Валидация URL-адреса
+     *
+     * @param {string} url URL-адрес для проверки
+     * @return {boolean} true, если URL валиден
+     */
+    function isValidURL(url) {
+        if (typeof url !== 'string' || !url.trim()) return false;
+        url = url.trim();
+        // Только строгое начало и доменное имя, запрет пробелов
+        const regex = /^(https?:\/\/)(([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|localhost)(:\d+)?(\/.*)?$/;
+        if (/\s/.test(url)) return false;
+        return regex.test(url);
+    }
+
+    /**
+     Проверяет отличие формы настроек от сохранённых и проводит валидацию, включая URL.
+
+     :param prompts: Массив промптов
+     :param url: API URL
+     :param token: Токен LLM
+     :param timeout: Таймаут в мс
+     :param model: Модель LLM
+     :return: {dirty: ..., error: ...}
+     */
+    function validateSettingsForm({
+                                      prompts,
+                                      url,
+                                      token,
+                                      timeout,
+                                      model
+                                  }) {
+        // Базовая валидация — минимум 1 промпт, все поля промпта не пустые
+        if (!Array.isArray(prompts) || prompts.length === 0) {
+            return {dirty: true, error: "Требуется минимум один промпт"};
+        }
+        log(`Prompts: ${JSON.stringify(prompts)}`);
+        const someEmptyPrompt = prompts.some(p => !p.title.trim() || !p.prompt.trim());
+        log(`Some empty prompt: ${someEmptyPrompt}`);
+        if (someEmptyPrompt) {
+            return {dirty: true, error: "Все промпты должны иметь название и текст"};
+        }
+
+        // Валидация URL
+        if (!isValidURL(url)) {
+            return {dirty: true, error: "Некорректный URL"};
+        }
+
+        // Сравнение с сохранёнными (без deepEqual, только по соответствию)
+        const settings = loadSettings();
+        let dirty = false;
+        if (!(Array.isArray(settings.prompts) && settings.prompts.length === prompts.length
+            && settings.prompts.every((p, idx) =>
+                p.id === prompts[idx].id &&
+                p.title === prompts[idx].title &&
+                p.prompt === prompts[idx].prompt))) {
+            dirty = true;
+        }
+        if ((settings.url || "") !== (url || "")) dirty = true;
+        if ((settings.token || "") !== (token || "")) dirty = true;
+        if ((settings.model || "") !== (model || "")) dirty = true;
+        if ((settings.timeout || 0) !== (timeout || 0)) dirty = true;
+
+        return {dirty, error: ""};
+    }
+
+    /**
+     Устанавливает стиль кнопки "Сохранить" по состоянию (dirty/error/обычное).
+     */
+    function setSaveBtnStatus(saveBtn, dirty, error) {
+        /**
+         Устанавливает оформление кнопки "Сохранить" по валидации
+
+         :param saveBtn: DOM-элемент кнопки
+         :param dirty: Были ли изменения
+         :param error: Строка ошибки или ""
+         */
+        if (!saveBtn) return;
+        const messageInfo = q('.modal-message-info');
+        saveBtn.style.transition = "background 0.18s";
+        if (error) {
+            messageInfo.style.display = "block";
+            messageInfo.style.background = "#911b1b";
+            messageInfo.textContent = error;
+            saveBtn.style.background = "#911b1b";
+            saveBtn.style.color = "#fff";
+            saveBtn.onmouseenter = function () {
+                saveBtn.style.background = "#591414";
+            };
+            saveBtn.onmouseleave = function () {
+                saveBtn.style.background = "#911b1b";
+            };
+            saveBtn.disabled = true;
+            saveBtn.title = error;
+        } else if (dirty) {
+            messageInfo.style.display = "block";
+            messageInfo.style.background = "#2f5b36";
+            messageInfo.textContent = "Есть несохранённые изменения";
+            saveBtn.style.background = "#2f5b36";
+            saveBtn.style.color = "#fff";
+            saveBtn.onmouseenter = function () {
+                saveBtn.style.background = "#1e4124";
+            };
+            saveBtn.onmouseleave = function () {
+                saveBtn.style.background = "#2f5b36";
+            };
+            saveBtn.disabled = false;
+            saveBtn.title = "Сохранить изменения";
+        } else {
+            messageInfo.style.display = "none";
+            messageInfo.style.background = "#4a4d4d";
+            messageInfo.textContent = "Нет изменений";
+            saveBtn.style.background = "";
+            saveBtn.style.color = "";
+            saveBtn.onmouseenter = null;
+            saveBtn.onmouseleave = null;
+            saveBtn.disabled = true;
+            saveBtn.title = "Нет изменений";
+        }
+    }
+
+    /**
      * Заполнение формы настроек
      *
      * @param {object} args Настройки
@@ -2459,18 +2896,18 @@ A: [Ответ]
         btnAdd.textContent = '✚';
         btnAdd.onclick = function () {
             const rows = block.querySelectorAll('.prompt-block-row');
-            const { block: newBlock, inputTitle } = makePromptRow({
+            const {block: newBlock, inputTitle} = makePromptRow({
                 id: genPromptId(),
                 title: '',
                 prompt: ''
-            }, rows.length, rows.length + 1);
+            }, rows.length, rows.length + 1, applyValidation);
             block.appendChild(newBlock);
             updatePromptDeleteButtons(block);
-            log('Settings: new prompt row added');
             setTimeout(() => {
                 if (inputTitle) inputTitle.focus();
                 block.scrollTop = block.scrollHeight;
             }, 10);
+            setTimeout(applyValidation, 14);
         };
         headerBtns.appendChild(btnAdd);
 
@@ -2478,7 +2915,7 @@ A: [Ответ]
         block.appendChild(headerDiv);
 
         promps.forEach((pr, idx) => {
-            const { block: promptRow } = makePromptRow(pr, idx, promps.length);
+            const {block: promptRow} = makePromptRow(pr, idx, promps.length, applyValidation);
             block.appendChild(promptRow);
         });
 
@@ -2488,18 +2925,63 @@ A: [Ответ]
         q(`#yts-setting-url`).value = url || DEFAULT_SETTINGS.url;
         q(`#yts-setting-token`).value = token || DEFAULT_SETTINGS.token;
         q(`#yts-setting-model`).value = model || DEFAULT_SETTINGS.model;
+
+        // --- Подключение авто-валидации и подсветки кнопки "Сохранить" ---
+        const blockPrompts = block;
+        const inputUrl = q('#yts-setting-url');
+        const inputToken = q('#yts-setting-token');
+        const inputTimeout = q('#yts-setting-timeout');
+        const inputModel = q('#yts-setting-model');
+        const btnSaveHere = q(`#${MODAL_ID} .modal-btn.save`);
+        const formNode = q(`#${MODAL_ID} form`);
+
+        function collectCurrentValues() {
+            // Собирает текущее состояние полей настроек
+            const prRows = blockPrompts.querySelectorAll('.prompt-block-row');
+            const arr = [];
+            for (let row of prRows) {
+                arr.push({
+                    id: row.dataset.id,
+                    title: row.querySelector('.prompt-input-title').value.trim(),
+                    prompt: row.querySelector('.prompt-input-prompt').value
+                });
+            }
+            return {
+                prompts: arr,
+                url: inputUrl.value,
+                token: inputToken.value,
+                timeout: parseInt(inputTimeout.value, 10),
+                model: inputModel.value
+            };
+        }
+
+        function applyValidation() {
+            if (!btnSaveHere) return;
+            const values = collectCurrentValues();
+            const {dirty, error} = validateSettingsForm(values);
+            setSaveBtnStatus(btnSaveHere, dirty, error);
+        }
+
+        if (btnSaveHere && formNode) {
+            formNode.addEventListener('input', applyValidation, true);
+            formNode.addEventListener('change', applyValidation, true);
+            formNode.addEventListener('keyup', applyValidation, true);
+            blockPrompts.addEventListener('DOMNodeInserted', applyValidation, true);
+            blockPrompts.addEventListener('DOMNodeRemoved', applyValidation, true);
+            setTimeout(applyValidation, 15);
+        }
     }
 
-
     /**
-     Создаёт строчку промпта
+     Создаёт строчку промпта с учетом автоматической валидации формы при удалении
 
      @param pr Объект промпта
      @param idx Индекс строки
      @param total Всего строк
+     @param applyValidation Функция для запуска валидации (вызов setTimeout внутри если нужно)
      @return Объект с DOM-элементом и ссылками на важные элементы
      */
-    function makePromptRow(pr, idx, total) {
+    function makePromptRow(pr, idx, total, applyValidation) {
         const block = document.createElement('div');
         block.className = 'prompt-block-row';
         block.dataset.id = pr.id;
@@ -2539,6 +3021,10 @@ A: [Ответ]
             const parent = block.parentElement;
             if (parent) updatePromptDeleteButtons(parent);
             log('Prompt row deleted');
+            // Корректно вызвать валидацию
+            if (typeof applyValidation === 'function') {
+                setTimeout(applyValidation, 14);
+            }
         };
         row1.appendChild(btnDel);
 
@@ -2556,7 +3042,7 @@ A: [Ответ]
         block.appendChild(row1);
         block.appendChild(row2);
 
-        return { block, inputTitle, inputPrompt };
+        return {block, inputTitle, inputPrompt};
     }
 
 
@@ -2701,8 +3187,14 @@ A: [Ответ]
      * @return {Promise<void>} Промис для завершения передачи
      */
     async function streamFetchLLM(url, opts, onDelta) {
-        log('Starting streaming fetch to LLM endpoint', {url, headers: opts.headers});
-        const resp = await fetch(url, opts);
+        const requestInit = {
+            ...('method' in opts ? { method: opts.method } : {}),
+            ...('headers' in opts ? { headers: opts.headers } : {}),
+            ...('body' in opts ? { body: opts.body } : {}),
+        };
+
+        log('Starting streaming fetch to LLM endpoint', {url, headers: requestInit.headers});
+        const resp = await fetch(url, requestInit);
         if (!resp.body) {
             log('fetch: No streaming body supported by fetch', null, 'error');
             throw new Error('Нет поддержки стриминга у fetch');
