@@ -33,7 +33,7 @@
     if (window.self !== window.top) return;
 
     // === Константы и идентификаторы ===
-    const USE_GM_STORAGE = false;
+    const USE_GM_STORAGE = true;
     const MODULE_NAME = "YTS";
     const STORAGE_KEY = 'yts-settings';
     const TARGET_BUTTON_ELEMENT = "#owner";
@@ -3240,9 +3240,9 @@ A: [Ответ]
      */
     async function streamFetchLLM(url, opts, onDelta) {
         const requestInit = {
-            ...('method' in opts ? { method: opts.method } : {}),
-            ...('headers' in opts ? { headers: opts.headers } : {}),
-            ...('body' in opts ? { body: opts.body } : {}),
+            ...('method' in opts ? {method: opts.method} : {}),
+            ...('headers' in opts ? {headers: opts.headers} : {}),
+            ...('body' in opts ? {body: opts.body} : {}),
         };
 
         log('Starting streaming fetch to LLM endpoint', {url, headers: requestInit.headers});
