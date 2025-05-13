@@ -8,7 +8,7 @@
 // @icon           https://www.youtube.com/favicon.ico
 // @author         Reydan46
 // @namespace      yts
-// @version        0.8.4
+// @version        0.8.6
 // @homepageURL    https://github.com/Reydan46/youtube-summary-button
 // @supportURL     https://github.com/Reydan46/youtube-summary-button/issues
 // @updateURL      https://raw.githubusercontent.com/Reydan46/youtube-summary-button/main/yts.user.js
@@ -16,6 +16,8 @@
 // @grant          GM_addStyle
 // @grant          GM_setClipboard
 // @grant          GM_info
+// @grant          GM_setValue
+// @grant          GM_getValue
 // @match          https://*.youtube.com/*
 // @connect        api.openai.com
 // @connect        raw.githubusercontent.com
@@ -31,6 +33,7 @@
     if (window.self !== window.top) return;
 
     // === Константы и идентификаторы ===
+    const USE_GM_STORAGE = false;
     const MODULE_NAME = "YTS";
     const STORAGE_KEY = 'yts-settings';
     const TARGET_BUTTON_ELEMENT = "#owner";
@@ -1025,6 +1028,36 @@ A: [Ответ]
     }
 
     /**
+     * Устанавливает значение по ключу в зависимости от наличия GM_setValue и глобального флага
+     *
+     * @param {string} name Ключ
+     * @param {any} value Значение (любое — преобразуется в строку)
+     */
+    function setSettingValue(name, value) {
+        if (USE_GM_STORAGE && typeof GM_setValue === "function") {
+            GM_setValue(name, value);
+            return;
+        }
+        window.localStorage.setItem(name, value);
+    }
+
+    /**
+     * Получает значение по ключу с учётом GM_getValue и глобального флага
+     *
+     * @param {string} name Ключ
+     * @param {any} [def] Значение по умолчанию
+     * @return {any} Значение или значение по умолчанию
+     */
+    function getSettingValue(name, def) {
+        if (USE_GM_STORAGE && typeof GM_getValue === "function") {
+            let v = GM_getValue(name, undefined);
+            return typeof v !== "undefined" ? v : def;
+        }
+        let v = window.localStorage.getItem(name);
+        return v !== null ? v : def;
+    }
+
+    /**
      * Сохранение настроек
      *
      * @param {object} settings Настройки
@@ -1032,7 +1065,7 @@ A: [Ответ]
     function saveSettings(settings) {
         const delta = JSON.stringify(getSettingsDelta(DEFAULT_SETTINGS, settings));
         log('Save settings', delta);
-        localStorage.setItem(STORAGE_KEY, delta);
+        setSettingValue(STORAGE_KEY, delta);
     }
 
     /**
@@ -1042,7 +1075,7 @@ A: [Ответ]
      */
     function loadSettings() {
         try {
-            const data = localStorage.getItem(STORAGE_KEY);
+            const data = getSettingValue(STORAGE_KEY, null);
             if (!data) {
                 return {...DEFAULT_SETTINGS};
             }
@@ -2343,6 +2376,7 @@ A: [Ответ]
                     }
                     showModelsSelectModal(models, m => {
                         modelInput.value = m;
+                        setTimeout(applyValidation, 14);
                     });
                 } catch (e) {
                     alert("Ошибка получения моделей: " + (e.message || e));
@@ -2853,6 +2887,55 @@ A: [Ответ]
     }
 
     /**
+     * Собирает текущее состояние полей настроек
+     *
+     * @return {object} Объект с настройками
+     */
+    function collectCurrentValues() {
+        /**
+         * Собирает текущие значения настроек формы
+         *
+         * @return {object} Текущее состояние всех полей (prompts, url, token, timeout, model)
+         */
+        const blockPrompts = document.querySelector(`#${MODAL_ID} #prompt-list-block`);
+        const inputUrl = document.querySelector('#yts-setting-url');
+        const inputToken = document.querySelector('#yts-setting-token');
+        const inputTimeout = document.querySelector('#yts-setting-timeout');
+        const inputModel = document.querySelector('#yts-setting-model');
+
+        const prRows = blockPrompts ? blockPrompts.querySelectorAll('.prompt-block-row') : [];
+        const arr = [];
+        for (let row of prRows) {
+            arr.push({
+                id: row.dataset.id,
+                title: row.querySelector('.prompt-input-title').value.trim(),
+                prompt: row.querySelector('.prompt-input-prompt').value
+            });
+        }
+        return {
+            prompts: arr,
+            url: inputUrl ? inputUrl.value : '',
+            token: inputToken ? inputToken.value : '',
+            timeout: inputTimeout ? parseInt(inputTimeout.value, 10) : 0,
+            model: inputModel ? inputModel.value : ''
+        };
+    }
+
+    /**
+     * Применяет авто-валидацию и подсветку кнопки "Сохранить"
+     */
+    function applyValidation() {
+        /**
+         * Применяет авто-валидацию формы настроек и обновляет состояние кнопки "Сохранить"
+         */
+        const btnSaveHere = document.querySelector(`#${MODAL_ID} .modal-btn.save`);
+        if (!btnSaveHere) return;
+        const values = collectCurrentValues();
+        const {dirty, error} = validateSettingsForm(values);
+        setSaveBtnStatus(btnSaveHere, dirty, error);
+    }
+
+    /**
      * Заполнение формы настроек
      *
      * @param {object} args Настройки
@@ -2928,39 +3011,8 @@ A: [Ответ]
 
         // --- Подключение авто-валидации и подсветки кнопки "Сохранить" ---
         const blockPrompts = block;
-        const inputUrl = q('#yts-setting-url');
-        const inputToken = q('#yts-setting-token');
-        const inputTimeout = q('#yts-setting-timeout');
-        const inputModel = q('#yts-setting-model');
         const btnSaveHere = q(`#${MODAL_ID} .modal-btn.save`);
         const formNode = q(`#${MODAL_ID} form`);
-
-        function collectCurrentValues() {
-            // Собирает текущее состояние полей настроек
-            const prRows = blockPrompts.querySelectorAll('.prompt-block-row');
-            const arr = [];
-            for (let row of prRows) {
-                arr.push({
-                    id: row.dataset.id,
-                    title: row.querySelector('.prompt-input-title').value.trim(),
-                    prompt: row.querySelector('.prompt-input-prompt').value
-                });
-            }
-            return {
-                prompts: arr,
-                url: inputUrl.value,
-                token: inputToken.value,
-                timeout: parseInt(inputTimeout.value, 10),
-                model: inputModel.value
-            };
-        }
-
-        function applyValidation() {
-            if (!btnSaveHere) return;
-            const values = collectCurrentValues();
-            const {dirty, error} = validateSettingsForm(values);
-            setSaveBtnStatus(btnSaveHere, dirty, error);
-        }
 
         if (btnSaveHere && formNode) {
             formNode.addEventListener('input', applyValidation, true);
