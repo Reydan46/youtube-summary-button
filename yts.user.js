@@ -8,7 +8,7 @@
 // @icon           https://www.youtube.com/favicon.ico
 // @author         Reydan46
 // @namespace      yts
-// @version        0.8.6
+// @version        0.8.7
 // @homepageURL    https://github.com/Reydan46/youtube-summary-button
 // @supportURL     https://github.com/Reydan46/youtube-summary-button/issues
 // @updateURL      https://raw.githubusercontent.com/Reydan46/youtube-summary-button/main/yts.user.js
@@ -51,6 +51,38 @@
     let ytsErrorAlreadyShown = false;
     let currentResult = "";
     let globalVideoData = {};
+
+    // === Перечисление SVG-иконок ===
+    const ICONS = {
+    COPY: {
+        elements: [
+            {
+                type: 'rect',
+                attrs: {x: '9', y: '9', width: '13', height: '13', rx: '2'}
+            },
+            {
+                type: 'path',
+                attrs: {d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'}
+            }
+        ]
+    },
+    SUBTITLES: {
+        elements: [
+            {
+                type: 'text',
+                attrs: {
+                    x: '2',
+                    y: '16',
+                    'font-size': '15',
+                    'font-weight': '600',
+                    'font-family': 'Arial',
+                    fill: 'currentColor'
+                },
+                text: 'CC'
+            }
+        ]
+    }
+};
 
     // === Стейт/настройки по-умолчанию ===
     const DEFAULT_PROMPTS = [
@@ -200,6 +232,21 @@ A: [Ответ]
             }
             .yts-copy-btn.yts-copy-success{
                 background-color: #43ff004f !important;
+            }
+
+            .yts-copy-btn svg {
+                display: inline-block;
+                vertical-align: middle;
+                color: #717171;
+                transition: color 0.2s;
+            }
+
+            .yts-copy-btn:hover svg {
+                color: #ffffff;
+            }
+
+            .yts-copy-btn.yts-copy-success svg {
+                color: #43ff71;
             }
 
             #${RESULT_CONTAINER_ID} .result-content {
@@ -1252,7 +1299,7 @@ A: [Ответ]
 
         const btnCopySummary = createButtonIcon({
             title: 'Копировать результат',
-            icon: '📋',
+            icon: ICONS.COPY,
             onClick: function () {
                 GM_setClipboard(currentResult, 'text');
                 markBtnCopied(btnCopySummary);
@@ -1263,7 +1310,7 @@ A: [Ответ]
 
         const btnCopySubs = createButtonIcon({
             title: 'Копировать субтитры',
-            icon: '💬',
+            icon: ICONS.SUBTITLES,
             onClick: function (evt) {
                 if (evt.button === 0) {
                     GM_setClipboard(globalVideoData.subtitlesFull, 'text');
@@ -1311,16 +1358,42 @@ A: [Ответ]
      *
      * @param {object} args аргументы
      * @param {string} args.title Текст подсказки
-     * @param {string} args.icon Emoji/иконка кнопки
+     * @param {string} args.icon SVG-иконка кнопки
      * @param {function} args.onClick Обработчик клика
      * @return {HTMLElement} DOM-элемент кнопки
      */
-    function createButtonIcon({title = '', icon = '', onClick}) {
+    function createButtonIcon({title = '', icon = null, onClick}) {
         const btn = document.createElement('button');
         btn.type = "button";
         btn.className = 'yts-copy-btn yt-spec-button-shape-next--mono yt-spec-button-shape-next--tonal';
         btn.title = title;
-        btn.innerText = icon;
+
+        if (icon) {
+            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.setAttribute("width", "16");
+            svg.setAttribute("height", "16");
+            svg.setAttribute("viewBox", "0 0 24 24");
+            svg.setAttribute("fill", "none");
+            svg.setAttribute("stroke", "currentColor");
+            svg.setAttribute("stroke-width", "2");
+
+            icon.elements.forEach(el => {
+                const element = document.createElementNS("http://www.w3.org/2000/svg", el.type);
+
+                Object.entries(el.attrs).forEach(([key, value]) => {
+                    element.setAttribute(key, value);
+                });
+
+                if (el.type === 'text' && el.text) {
+                    element.textContent = el.text;
+                }
+
+                svg.appendChild(element);
+            });
+
+            btn.appendChild(svg);
+        }
+
         btn.addEventListener('click', onClick);
         return btn;
     }
