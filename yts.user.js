@@ -8,7 +8,7 @@
 // @icon           https://www.youtube.com/favicon.ico
 // @author         Reydan46
 // @namespace      yts
-// @version        0.8.7
+// @version        0.8.8
 // @homepageURL    https://github.com/Reydan46/youtube-summary-button
 // @supportURL     https://github.com/Reydan46/youtube-summary-button/issues
 // @updateURL      https://raw.githubusercontent.com/Reydan46/youtube-summary-button/main/yts.user.js
@@ -44,6 +44,7 @@
     const CONTEXT_MENU_ID = 'YTS_ContextMenu';
     const PROMPT_PREVIEW_MODAL_ID = 'YTS_PromptPreviewModal';
     const PROMPT_DOC_MODAL_ID = 'YTS_PromptDocModal';
+    const CUSTOM_PROMPT_MODAL_ID = 'YTS_CustomPromptModal';
 
     let ytsPrintBuffer = [];
     let ytsPrintTimer = null;
@@ -54,35 +55,35 @@
 
     // === Перечисление SVG-иконок ===
     const ICONS = {
-    COPY: {
-        elements: [
-            {
-                type: 'rect',
-                attrs: {x: '9', y: '9', width: '13', height: '13', rx: '2'}
-            },
-            {
-                type: 'path',
-                attrs: {d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'}
-            }
-        ]
-    },
-    SUBTITLES: {
-        elements: [
-            {
-                type: 'text',
-                attrs: {
-                    x: '2',
-                    y: '16',
-                    'font-size': '15',
-                    'font-weight': '600',
-                    'font-family': 'Arial',
-                    fill: 'currentColor'
+        COPY: {
+            elements: [
+                {
+                    type: 'rect',
+                    attrs: {x: '9', y: '9', width: '13', height: '13', rx: '2'}
                 },
-                text: 'CC'
-            }
-        ]
-    }
-};
+                {
+                    type: 'path',
+                    attrs: {d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'}
+                }
+            ]
+        },
+        SUBTITLES: {
+            elements: [
+                {
+                    type: 'text',
+                    attrs: {
+                        x: '2',
+                        y: '16',
+                        'font-size': '15',
+                        'font-weight': '600',
+                        'font-family': 'Arial',
+                        fill: 'currentColor'
+                    },
+                    text: 'CC'
+                }
+            ]
+        }
+    };
 
     // === Стейт/настройки по-умолчанию ===
     const DEFAULT_PROMPTS = [
@@ -121,21 +122,25 @@
         }, {
             id: 'moments',
             title: "Ключевые моменты",
-            prompt: `Ты — ассистент по анализу видеоконтента. Действуй по следующему регламенту:
+            prompt: `Ты — ассистент по анализу видеоконтента. Действуй строго согласно инструкции:
 
-Проанализируй предоставленные субтитры и выдели только самые важные моменты (ключевые события, повороты, открытия, выводы, логические части), которые представляют интерес для зрителя.
-Для каждого момента обязательно укажи только тот таймкод, который записан в начале строки субтитров, полностью и строго в том виде, как он есть в субтитрах (например: [00:10.12] или [00:15:09]). 
-Нельзя выдумывать, вычислять, изменять или округлять таймкоды — использовать разрешается только оригинальные таймкоды, которые даны в начале строк субтитров.
-Если требуется, чтобы момент начинался чуть раньше, выбери предыдущий имеющийся в субтитрах таймкод, но брать можно только из оригинальных строк субтитров, не из головы.
-Не пропускай и не заменяй ни один таймкод cубтитров своими интервалами, диапазонами или цифрами.
-Каждое описание момента делай сжато, лаконично, только самую суть происходящего, собственными словами, не копируя тексты или фразы из субтитров.
-Не добавляй пояснений, вводных, выводов и любой другой текст — только список важных моментов.
-Нельзя раскрывать ключевые сюжетные твисты, финалы, важные интриги и неожиданные развязки, если это может испортить просмотр зрителю. В описаниях важных моментов избегай явных спойлеров — ограничивайся намёком на событие или опиши его без указания подробных деталей и исходов.
-Соблюдай формат вывода:
+1. Проанализируй предоставленные эпизоды и субтитры. Выдели только самые важные и интересные моменты видео: ключевые события, переходы, открытия, этапы, выводы, логические части и структурные блоки.
+2. Для каждого выделенного момента указывай только оригинальный таймкод из начала строки субтитров, полностью и без изменений (например, [00:15:09] или [00:10.12]). Запрещается придумывать таймкоды, округлять или изменять их. Если нужно отразить событие чуть раньше, используй ближайший предыдущий из оригинальных субтитров.
+3. Не используй собственные диапазоны, интервалы или любые другие форматы тайминга — применяй только строки с таймкодами из субтитров.
+4. Описание каждого момента делай очень кратким, только суть, своими словами, не копируя текст субтитров. Не добавляй никаких пояснений, голосовых комментариев, вводных или заключений.
+5. В описаниях избегай спойлеров — никаких раскрытий ключевых твистов, финалов, неожиданных развязок; ограничься намёками либо общим описанием без подробных деталей и исходов.
+6. Форматируй ответ только в виде списка по одной строке на каждый момент:
 [таймкод] — описание
 [таймкод] — описание
 [таймкод] — описание
-и так далее, каждый момент — отдельной строкой.
+и так далее. Никаких пустых строк между пунктами.
+7. Эпизоды от автора могут не включать все важные моменты — добавляй любые значимые события из субтитров, даже если их нет среди эпизодов.
+8. Исключи пустые строки в ответе.
+9. В итоговом списке обязательно располагай все моменты строго по возрастанию времени таймкодов (от самого раннего к самому позднему).
+10. В ответе разрешён только тот формат таймкодов, который встречается в начале строк оригинальных субтитров. Не добавляй часы ([hh:mm:ss]), если в субтитрах изначально был только формат [mm:ss] или [mm:ss.xx]. Не меняй формат таймкодов, а используй их ровно в том виде, как они указаны в субтитрах.
+
+Эпизоды, предоставленные автором:
+{{episodes}}
 
 Используй следующие субтитры:
 {{subtitlesFull}}`
@@ -166,7 +171,9 @@ A: [Ответ]
         timeout: 180000,
         url: 'https://api.openai.com/v1/chat/completions',
         token: '',
-        model: 'gpt-4.1-nano'
+        model: 'gpt-4.1-nano',
+        customPromptText: '',
+        customPromptPlaceholders: ['subtitlesText']
     };
 
     /**
@@ -317,7 +324,7 @@ A: [Ответ]
                 font-weight: 500;
                 transition: background .12s;
             }
-    
+
             #${MODAL_ID} {
                 display:none;
                 position:fixed;
@@ -714,7 +721,7 @@ A: [Ответ]
                 border-top-left-radius: 12px;
                 border-top-right-radius: 12px;
             }
-            
+
             #${PROMPT_DOC_MODAL_ID} .modal-title {
                 font-size:23px;
                 font-weight:600;
@@ -829,7 +836,7 @@ A: [Ответ]
                 background: rgba(0,0,0,0.7);
                 z-index: 1000000;
             }
-            
+
             #model-select-modal .modal-inner {
                 background: #2b2b2b;
                 color: #f1f1f1;
@@ -842,7 +849,7 @@ A: [Ответ]
                 padding: 0px 10px 20px 20px;
                 position:relative;
             }
-            
+
             #model-select-modal .modal-topbar {
                 display: flex;
                 align-items: center;
@@ -856,7 +863,7 @@ A: [Ответ]
                 border-top-right-radius: 12px;
                 min-height: 40px;
             }
-            
+
             #model-select-modal .modal-title {
                 font-size:23px;
                 font-weight:600;
@@ -866,7 +873,7 @@ A: [Ответ]
                 user-select:none;
                 flex: 1;
             }
-            
+
             #model-select-modal .modal-close{
                 position: static;
                 font-size:40px;
@@ -880,7 +887,7 @@ A: [Ответ]
                 user-select:none;
                 z-index: 1;
             }
-            
+
             #model-select-modal .modal-close:hover{
                 color:#b1b1b1;
             }
@@ -912,6 +919,171 @@ A: [Ответ]
                 border-radius: 5px;
                 padding: 5px;
                 font-size: 12px;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} {
+                display: none;
+                position: fixed;
+                z-index: 999999;
+                left: 0;
+                top: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0,0,0,0.7);
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} .modal-inner {
+                background: #2b2b2b;
+                color: #f1f1f1;
+                border-radius: 12px;
+                box-shadow: 0 4px 38px 0 rgba(0,0,0,0.26);
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                transform: translate(-50%,-50%);
+                max-width: 1000px;
+                width: 97vw;
+                padding: 24px;
+                box-sizing: border-box;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} .modal-close {
+                position: absolute;
+                top: 15px;
+                right: 20px;
+                font-size: 40px;
+                font-weight: bold;
+                color: #636363;
+                cursor: pointer;
+                background: none;
+                border: none;
+                line-height: 1;
+                transition: color .16s;
+                user-select: none;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} .modal-close:hover {
+                color: #b1b1b1;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} .modal-title {
+                font-size: 23px;
+                font-weight: 600;
+                margin-bottom: 6px;
+                color: #f1f1f1;
+                letter-spacing: .01em;
+                text-align: center;
+                user-select: none;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} label {
+                display: block;
+                margin-bottom: 8px;
+                font-weight: 600;
+                color: #cdcdcd;
+                font-size: 14px;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} textarea {
+                width: 100%;
+                min-height: 120px;
+                font-size: 13px;
+                padding: 7px;
+                border-radius: 4px;
+                border: 1px solid #4a4d4d;
+                background: #252525;
+                color: #f1f1f1;
+                box-sizing: border-box;
+                resize: vertical;
+                font-family: inherit;
+                margin-bottom: 12px;
+                max-height: 700px;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} textarea:focus {
+                outline: none;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} .placeholders-container {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                margin-bottom: 20px;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} .custom-placeholder-select {
+                display: inline-block;
+                position: relative;
+                vertical-align: middle;
+                background: #3077bb;
+                border-radius: 18px;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} .custom-placeholder-select select {
+                border: none;
+                border-radius: 18px;
+                font-size: 13px;
+                cursor: pointer;
+                background: transparent;
+                color: #fff;
+                appearance: none;
+                outline: none;
+                font-weight: 500;
+                position: relative;
+                z-index: 2;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} .custom-placeholder-select select{
+                background-color: #3077bb;
+                color: #fff;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} .custom-placeholder-select select option {
+                background-color: #4a4d4d;
+                color: #fff;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} .custom-placeholder-select::after {
+                content: "▼";
+                position: absolute;
+                right: 10px;
+                top: 50%;
+                transform: translateY(-50%);
+                color: #fff;
+                pointer-events: none;
+                font-size: 13px;
+                font-weight: bold;
+                z-index: 3;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} select {
+                padding: 6px 12px;
+                border: none;
+                border-radius: 18px;
+                font-size: 13px;
+                cursor: pointer;
+                background: #4a4d4d;
+                color: #f1f1f1;
+                appearance: none;
+                padding-right: 24px;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} button.placeholder-toggle {
+                padding: 6px 12px;
+                border: none;
+                border-radius: 18px;
+                font-size: 13px;
+                cursor: pointer;
+                transition: all 0.2s;
+                background: #4a4d4d;
+                color: #f1f1f1;
+                margin-right: 0;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} button.placeholder-toggle.active {
+                background: #3077bb;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} .custom-execute-btn {
+                padding: 7px;
+                background: #3077bb;
+                color: #fff;
+                border: none;
+                border-radius: 5px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                transition: background 0.18s;
+                margin-top: 10px;
+                display: block;
+                margin-left: auto;
+                margin-right: auto;
+                width: 100%;
+            }
+            #${CUSTOM_PROMPT_MODAL_ID} .custom-execute-btn:hover {
+                background: #1d5993;
             }
         `);
     }
@@ -1134,10 +1306,12 @@ A: [Ответ]
             merged.prompts.forEach(p => {
                 if (!p.id) p.id = genPromptId();
             });
+            // Проверяем activePromptId с учетом специального значения 'custom'
             if (!merged.activePromptId ||
-                !merged.prompts.find(p => p.id === merged.activePromptId)
+                (merged.activePromptId !== 'custom' &&
+                    !merged.prompts.find(p => p.id === merged.activePromptId))
             ) {
-                log('Active prompt missing, setting as first from list');
+                log('Active prompt missing or invalid, setting as first from list');
                 merged.activePromptId = merged.prompts[0].id;
             }
             return merged;
@@ -1154,7 +1328,7 @@ A: [Ответ]
      */
     function setActivePrompt(promptId) {
         const settings = loadSettings();
-        if (settings.prompts.find(p => p.id === promptId)) {
+        if (promptId === 'custom' || settings.prompts.find(p => p.id === promptId)) {
             settings.activePromptId = promptId;
             saveSettings(settings);
             updateUIAfterPromptChange();
@@ -1170,6 +1344,13 @@ A: [Ответ]
      */
     function getActivePrompt() {
         const s = loadSettings();
+        if (s.activePromptId === 'custom') {
+            return {
+                id: 'custom',
+                title: 'Свой запрос',
+                prompt: s.customPromptText || ''
+            };
+        }
         return s.prompts.find(p => p.id === s.activePromptId) || s.prompts[0];
     }
 
@@ -1602,19 +1783,38 @@ A: [Ответ]
      @return Значение valueField или null
      */
     function extractTagAttribute(tag, keyField, keyValue, valueField, html) {
-        /**
-         Универсальный поиск значения нужного атрибута у заданного тега по произвольному признаку
-
-         @param tag Имя тега (например, "meta")
-         @param keyField Имя поля для поиска (например, "name" или "property")
-         @param keyValue Значение поля (например, "description")
-         @param valueField Имя извлекаемого атрибута (например, "content")
-         @param html HTML-контент для поиска
-         @return Значение атрибута valueField или null
-         */
         const re = new RegExp(`<${tag}[^>]+${keyField}=["']${keyValue}["'][^>]+${valueField}=["']([^"']+)["']`, 'i');
         const match = html.match(re);
         return match ? match[1].trim() : null;
+    }
+
+    /**
+     Выполняет извлечение пунктов списка эпизодов с YouTube разметки, формирует нормализованный список строк эпизодов
+
+     @return Массив строк эпизодов в формате "[мм:сс] Название"
+     */
+    function extractEpisodes() {
+        const items = document.querySelectorAll('ytd-macro-markers-list-item-renderer.ytd-macro-markers-list-renderer');
+        const episodes = [];
+        items.forEach(item => {
+            const titleEl = item.querySelector('h4.macro-markers[title]');
+            const timeEl = item.querySelector('div#time');
+            const title = titleEl ? titleEl.getAttribute('title') || titleEl.textContent.trim() : '';
+            const time = timeEl ? timeEl.textContent.trim() : '';
+            let normTime = time;
+            if (time && !time.match(/^\d{2}:\d{2}$/)) {
+                const parts = time.split(':').map(x => x.padStart(2, '0'));
+                if (parts.length === 2) {
+                    normTime = `${parts[0]}:${parts[1]}`;
+                } else if (parts.length === 3) {
+                    normTime = `${String(parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10)).padStart(2, '0')}:${parts[2]}`;
+                }
+            }
+            if (title && normTime) {
+                episodes.push(`[${normTime}] ${title}`);
+            }
+        });
+        return episodes.join('\n');
     }
 
     /**
@@ -1697,6 +1897,9 @@ A: [Ответ]
                 || NOT_DEFINED;
         })();
 
+        const episodes = extractEpisodes()
+            || NOT_DEFINED;
+
         const captionTracks = (() => {
             const tracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
             if (Array.isArray(tracks) && tracks.length > 0) {
@@ -1748,6 +1951,7 @@ A: [Ответ]
             lengthSeconds,
             category,
             thumbnailUrl,
+            episodes,
             subtitleUrl,
             subtitlesText,
             subtitlesFull
@@ -1833,6 +2037,27 @@ A: [Ответ]
             menu.appendChild(item);
         });
 
+        // Добавляем пункт "Свой запрос"
+        const customItem = document.createElement('div');
+        customItem.className = "menu-item";
+        if (settings.activePromptId === 'custom') customItem.classList.add('active');
+
+        const customMark = document.createElement('span');
+        customMark.className = 'mark';
+        customMark.textContent = settings.activePromptId === 'custom' ? '➤' : ' ';
+        customItem.appendChild(customMark);
+
+        const customLabel = document.createElement('span');
+        customLabel.textContent = 'Свой запрос';
+        customItem.appendChild(customLabel);
+
+        customItem.addEventListener('click', () => {
+            log('Context menu: user switched to custom prompt');
+            setActivePrompt('custom');
+            hideContextMenu();
+        });
+        menu.appendChild(customItem);
+
         const separator = document.createElement('div');
         separator.className = 'menu-separator';
         menu.appendChild(separator);
@@ -1860,6 +2085,296 @@ A: [Ответ]
             document.addEventListener(ev, hideContextMenu, {capture: true})
         );
         window.addEventListener('blur', hideContextMenu);
+    }
+
+    /**
+     * Обработчик нажатия на кнопку "Выполнить" в окне кастомного промпта
+     *
+     * :param modal: DOM-элемент модального окна
+     * :param promptTextarea: DOM-элемент textarea промпта
+     * :param placeholdersContainer: DOM-элемент с плейсхолдерами
+     */
+    function handleCustomPromptExecuteBtn(modal, promptTextarea, placeholdersContainer) {
+        log('handleCustomPromptExecuteBtn: called');
+        const customPrompt = promptTextarea.value.trim();
+        if (!customPrompt) {
+            log('handleCustomPromptExecuteBtn: empty custom prompt');
+            alert('Введите текст запроса');
+            return;
+        }
+
+        // Собираем выбранные плейсхолдеры с описаниями
+        const selected = [];
+
+        // Кнопки
+        placeholdersContainer.querySelectorAll('button.placeholder-toggle.active').forEach(btn => {
+            selected.push({
+                key: btn.dataset.key,
+                label: btn.textContent.trim()
+            });
+        });
+
+        // Селектор субтитров
+        const subtitlesSelect = placeholdersContainer.querySelector('select');
+        if (subtitlesSelect && subtitlesSelect.value) {
+            const opt = subtitlesSelect.selectedOptions[0];
+            selected.push({
+                key: subtitlesSelect.value,
+                label: opt ? opt.textContent.trim() : subtitlesSelect.value
+            });
+        }
+
+        log('Used custom prompt placeholders', selected);
+
+        const activePlaceholders = selected.map(i => i.key);
+
+        const currentSettings = loadSettings();
+        currentSettings.customPromptText = customPrompt;
+        currentSettings.customPromptPlaceholders = activePlaceholders;
+        saveSettings(currentSettings);
+
+        modal.remove();
+
+        if (ytsPrintTimer) {
+            clearInterval(ytsPrintTimer);
+            ytsPrintTimer = null;
+        }
+        ytsPrintBuffer = [];
+        ytsPrintIsComplete = false;
+        ytsErrorAlreadyShown = false;
+        currentResult = "";
+
+        restoreResultContainer();
+        createOrUpdateResultContainer(true).then(() => {
+            log('handleCustomPromptExecuteBtn: started loading video data for custom prompt');
+            getVideoFullData().then(videoData => {
+                let fullPrompt = customPrompt;
+                if (selected.length > 0) {
+                    fullPrompt += '\n\n';
+                    selected.forEach(sel => {
+                        if (videoData[sel.key] !== undefined) {
+                            fullPrompt += `${sel.label}: ${videoData[sel.key]}\n`;
+                        }
+                    });
+                }
+                log('handleCustomPromptExecuteBtn: sending to API', {usedPlaceholders: selected});
+                sendToAPI({...videoData, customPrompt: fullPrompt}).catch(error => {
+                    showError(error.message || 'Ошибка при обработке запроса');
+                    log('handleCustomPromptExecuteBtn: sendToAPI error', error, 'error');
+                });
+            }).catch(error => {
+                showError(error.message || 'Ошибка при обработке запроса');
+                log('handleCustomPromptExecuteBtn: getVideoFullData error', error, 'error');
+            });
+        });
+    }
+
+    /**
+     * Показывает модальное окно для ввода кастомного промпта
+     */
+    function showCustomPromptModal() {
+        log('showCustomPromptModal: called');
+        let modal = document.getElementById(CUSTOM_PROMPT_MODAL_ID);
+
+        if (!modal) {
+            log('showCustomPromptModal: creating modal');
+            modal = document.createElement('div');
+            modal.id = CUSTOM_PROMPT_MODAL_ID;
+            modal.style.display = 'block';
+
+            const modalInner = document.createElement('div');
+            modalInner.className = 'modal-inner';
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'modal-close';
+            closeBtn.type = 'button';
+            closeBtn.textContent = '×';
+            closeBtn.title = 'Закрыть';
+            closeBtn.onclick = () => {
+                log('showCustomPromptModal: close clicked');
+                modal.remove();
+            };
+
+            const title = document.createElement('div');
+            title.className = 'modal-title';
+            title.textContent = 'Свой запрос';
+
+            const promptLabel = document.createElement('label');
+            promptLabel.textContent = 'Текст запроса:';
+
+            const promptTextarea = document.createElement('textarea');
+            promptTextarea.placeholder = 'Введите ваш запрос к LLM...';
+
+            const settings = loadSettings();
+            promptTextarea.value = settings.customPromptText || '';
+
+            const placeholdersLabel = document.createElement('label');
+            placeholdersLabel.textContent = 'Добавить к запросу данные:';
+
+            const placeholdersContainer = document.createElement('div');
+            placeholdersContainer.className = 'placeholders-container';
+
+            const placeholders = [
+                {
+                    key: 'subtitles', label: 'Субтитры', options: [
+                        {value: 'subtitlesText', label: 'Субтитры (только текст)'},
+                        {value: 'subtitlesFull', label: 'Субтитры (с таймкодами)'}
+                    ]
+                },
+                {key: 'episodes', label: 'Эпизоды (с таймкодами)'},
+                {key: 'title', label: 'Название видео'},
+                {key: 'shortDescription', label: 'Описание видео'},
+                {key: 'channelName', label: 'Название канала'},
+                {key: 'publishDate', label: 'Дата публикации'},
+                {key: 'lengthSeconds', label: 'Длительность'},
+                {key: 'category', label: 'Категория'},
+                {key: 'keywords', label: 'Ключевые слова'},
+                {key: 'videoUrl', label: 'Ссылка на видео'},
+                {key: 'thumbnailUrl', label: 'Ссылка на превью'},
+            ];
+
+            const savedPlaceholders = settings.customPromptPlaceholders;
+
+            placeholders.forEach(ph => {
+                if (ph.options) {
+                    const selectWrap = document.createElement('div');
+                    selectWrap.className = 'custom-placeholder-select';
+
+                    const select = document.createElement('select');
+                    ph.options.forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt.value;
+                        option.textContent = opt.label;
+                        option.selected = savedPlaceholders.includes(opt.value);
+                        select.appendChild(option);
+                    });
+                    selectWrap.appendChild(select);
+                    placeholdersContainer.appendChild(selectWrap);
+                } else {
+                    const toggle = document.createElement('button');
+                    toggle.type = 'button';
+                    toggle.textContent = ph.label;
+                    toggle.dataset.key = ph.key;
+                    toggle.className = 'placeholder-toggle';
+                    if (savedPlaceholders.includes(ph.key)) {
+                        toggle.classList.add('active');
+                    }
+                    toggle.onclick = () => {
+                        toggle.classList.toggle('active');
+                    };
+                    placeholdersContainer.appendChild(toggle);
+                }
+            });
+
+            const btnBlock = document.createElement('div');
+            btnBlock.style.display = "flex";
+            btnBlock.style.gap = "8px";
+            btnBlock.style.justifyContent = "flex-end";
+            btnBlock.style.marginTop = "10px";
+
+            const executeBtn = document.createElement('button');
+            executeBtn.textContent = 'Выполнить';
+            executeBtn.className = 'custom-execute-btn';
+            executeBtn.disabled = promptTextarea.value.trim() === '';
+            executeBtn.style.transition = "background .18s, opacity .18s";
+            executeBtn.onclick = function () {
+                if (!executeBtn.disabled) {
+                    handleCustomPromptExecuteBtn(modal, promptTextarea, placeholdersContainer);
+                }
+            };
+
+            function styleExecuteBtn() {
+                if (executeBtn.disabled) {
+                    executeBtn.style.background = '#3e3e3e';
+                    executeBtn.style.color = '#b1b1b1';
+                    executeBtn.style.opacity = '0.6';
+                    executeBtn.style.cursor = 'default';
+                } else {
+                    executeBtn.style.background = '#3077bb';
+                    executeBtn.style.color = '#fff';
+                    executeBtn.style.opacity = '';
+                    executeBtn.style.cursor = 'pointer';
+                }
+            }
+
+            executeBtn.onmouseenter = function () {
+                if (!executeBtn.disabled) {
+                    executeBtn.style.background = '#1d5993';
+                }
+            };
+
+            executeBtn.onmouseleave = function () {
+                if (!executeBtn.disabled) {
+                    executeBtn.style.background = '#3077bb';
+                }
+            };
+
+            styleExecuteBtn();
+
+            const resetBtn = document.createElement('button');
+            resetBtn.textContent = 'Сброс';
+            resetBtn.type = 'button';
+            resetBtn.className = 'custom-execute-btn custom-reset-btn';
+            resetBtn.style.background = '#762c83';
+            resetBtn.style.color = '#fff';
+            resetBtn.style.marginRight = 'auto';
+            resetBtn.style.transition = "background .18s";
+            resetBtn.onmouseenter = function () {
+                resetBtn.style.background = '#56215f';
+            };
+            resetBtn.onmouseleave = function () {
+                resetBtn.style.background = '#762c83';
+            };
+            resetBtn.onclick = function () {
+                promptTextarea.value = '';
+                executeBtn.disabled = true;
+                styleExecuteBtn();
+
+                const selects = placeholdersContainer.querySelectorAll('select');
+                if (selects.length) {
+                    selects[0].value = 'subtitlesText';
+                }
+
+                const placeholderButtons = placeholdersContainer.querySelectorAll('button.placeholder-toggle');
+                placeholderButtons.forEach(btn => {
+                    if (DEFAULT_SETTINGS.customPromptPlaceholders.includes(btn.dataset.key)) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+
+                const currentSettings = loadSettings();
+                currentSettings.customPromptText = DEFAULT_SETTINGS.customPromptText;
+                currentSettings.customPromptPlaceholders = DEFAULT_SETTINGS.customPromptPlaceholders;
+                saveSettings(currentSettings);
+            };
+
+            promptTextarea.addEventListener('input', function () {
+                executeBtn.disabled = promptTextarea.value.trim() === '';
+                styleExecuteBtn();
+            });
+
+            btnBlock.appendChild(resetBtn);
+            btnBlock.appendChild(executeBtn);
+
+            modalInner.append(
+                closeBtn,
+                title,
+                promptLabel,
+                promptTextarea,
+                placeholdersLabel,
+                placeholdersContainer,
+                btnBlock
+            );
+            modal.appendChild(modalInner);
+            document.body.appendChild(modal);
+        } else {
+            log('showCustomPromptModal: modal exists, reopening');
+        }
+
+        modal.style.display = 'block';
+        modal.querySelector('textarea').focus();
     }
 
     /**
@@ -2644,6 +3159,7 @@ A: [Ответ]
                 {code: '{{videoUrl}}', desc: 'Ссылка на видео.'},
                 {code: '{{thumbnailUrl}}', desc: 'Ссылка на изображение превью.'},
                 {code: '{{keywords}}', desc: 'Ключевые слова (список, через запятую).'},
+                {code: '{{episodes}}', desc: 'Эпизоды с разметкой времени (таймкоды в начале каждой строки).'},
                 {code: '{{videoData}}', desc: 'Все параметры видео списком вида "ключ: значение".'}
             ].forEach(ph => {
                 const tr = document.createElement('tr');
@@ -3395,6 +3911,11 @@ A: [Ответ]
      * @return {string} Строка с заменами
      */
     function replacePromptVars(template, data) {
+        // Если это кастомный промпт, возвращаем его как есть
+        if (data.customPrompt) {
+            return data.customPrompt;
+        }
+
         const replacedKeys = new Set();
 
         // Парсер цепочка действий вида action1(args),action2(args ...)
@@ -3652,6 +4173,14 @@ A: [Ответ]
      * @return {Promise<void>} Промис
      */
     async function performPromptedAction() {
+        const settings = loadSettings();
+
+        // Если выбран кастомный промпт, показываем окно ввода
+        if (settings.activePromptId === 'custom') {
+            showCustomPromptModal();
+            return;
+        }
+
         log('Starting prompt action...');
         if (ytsPrintTimer) {
             clearInterval(ytsPrintTimer);
