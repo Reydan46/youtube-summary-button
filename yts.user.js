@@ -8,7 +8,7 @@
 // @icon           https://www.youtube.com/favicon.ico
 // @author         Reydan46
 // @namespace      yts
-// @version        0.8.8
+// @version        0.8.9
 // @homepageURL    https://github.com/Reydan46/youtube-summary-button
 // @supportURL     https://github.com/Reydan46/youtube-summary-button/issues
 // @updateURL      https://raw.githubusercontent.com/Reydan46/youtube-summary-button/main/yts.user.js
@@ -2483,7 +2483,8 @@ A: [Ответ]
             log('fetchLLMModels: invalid /v1/models response structure', data, 'error');
             throw new Error("Некорректный ответ от API /v1/models");
         }
-        const ids = data.data.map(m => m.id);
+        // const ids = data.data.map(m => m.id);
+        const ids = data.data.filter(m => m.owned_by !== "image").map(m => m.id);
         log('fetchLLMModels: models ids', ids);
         return ids;
     }
