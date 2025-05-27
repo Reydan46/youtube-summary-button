@@ -101,6 +101,7 @@
             extractionError: 'Не удалось извлечь текст из субтитров',
             jsonParsingError: 'Ошибка разбора JSON файла: ',
             settingsImportError: 'Ошибка импорта настроек: ',
+            requestError: 'Ошибка при обработке запроса',
 
             // Утилиты настроек
             resetPrompts: 'Сбросить промпты',
@@ -164,6 +165,29 @@
             promptExTitleFormat: 'название видео, в нижнем регистре и без пробелов',
             promptTip: 'Совет: ',
             promptPreviewNote: 'Используйте предпросмотр (👁️ в настройках промпта), чтобы увидеть, как данные подставляются в шаблон.',
+
+            // Кастомные промпты
+            customPrompt: 'Свой запрос',
+            customPromptLabel: 'Текст запроса:',
+            customPromptPlaceholder: 'Введите ваш запрос к LLM...',
+            customPromptInclude: 'Включить в запрос:',
+            customPromptBtnExecute: 'Выполнить',
+            customPromptBtnReset: 'Сброс',
+            customPromptBtnClose: 'Закрыть',
+            customPromptAlertEmpty: 'Введите текст запроса',
+            customPromptPlaceholderSubtitles: 'Субтитры',
+            customPromptPlaceholderSubtitlesText: 'Субтитры (только текст)',
+            customPromptPlaceholderSubtitlesFull: 'Субтитры (с таймкодами)',
+            customPromptPlaceholderEpisodes: 'Эпизоды (с таймкодами)',
+            customPromptPlaceholderTitle: 'Название видео',
+            customPromptPlaceholderShortDescription: 'Описание видео',
+            customPromptPlaceholderChannelName: 'Название канала',
+            customPromptPlaceholderPublishDate: 'Дата публикации',
+            customPromptPlaceholderLengthSeconds: 'Длительность',
+            customPromptPlaceholderCategory: 'Категория',
+            customPromptPlaceholderKeywords: 'Ключевые слова',
+            customPromptPlaceholderVideoUrl: 'Ссылка на видео',
+            customPromptPlaceholderThumbnailUrl: 'Ссылка на превью',
 
             // Прочее
             testTitle: 'Проверка промпта (реальные данные)',
@@ -287,6 +311,29 @@
             promptExTitleFormat: 'video title, in lowercase and with no spaces',
             promptTip: 'Tip: ',
             promptPreviewNote: 'Use preview mode (👁️ in the prompt settings) to see how data is substituted in the template.',
+
+            // Custom prompts
+            customPrompt: 'Custom prompt',
+            customPromptLabel: 'Prompt text:',
+            customPromptPlaceholder: 'Enter your prompt for LLM...',
+            customPromptInclude: 'Include in request:',
+            customPromptBtnExecute: 'Execute',
+            customPromptBtnReset: 'Reset',
+            customPromptBtnClose: 'Close',
+            customPromptAlertEmpty: 'Enter a prompt text',
+            customPromptPlaceholderSubtitles: 'Subtitles',
+            customPromptPlaceholderSubtitlesText: 'Subtitles (text only)',
+            customPromptPlaceholderSubtitlesFull: 'Subtitles (with timestamps)',
+            customPromptPlaceholderEpisodes: 'Chapters (with timestamps)',
+            customPromptPlaceholderTitle: 'Video title',
+            customPromptPlaceholderShortDescription: 'Video description',
+            customPromptPlaceholderChannelName: 'Channel name',
+            customPromptPlaceholderPublishDate: 'Publish date',
+            customPromptPlaceholderLengthSeconds: 'Duration',
+            customPromptPlaceholderCategory: 'Category',
+            customPromptPlaceholderKeywords: 'Keywords',
+            customPromptPlaceholderVideoUrl: 'Video link',
+            customPromptPlaceholderThumbnailUrl: 'Thumbnail link',
 
             // Misc
             testTitle: 'Prompt check (real data)',
@@ -638,7 +685,6 @@ Use these subtitles:
                 display: flex !important;
             }
             #${RESULT_CONTAINER_ID}.yts-minimized .yts-title-row .result-title::after {
-                content: " (свёрнуто)";
                 color: #b9b9aa;
                 font-size: 12px;
                 margin-left: 4px;
@@ -1708,7 +1754,7 @@ Use these subtitles:
         if (s.activePromptId === 'custom') {
             return {
                 id: 'custom',
-                title: 'Свой запрос',
+                title: t('customPrompt'),
                 prompt: s.customPromptText || ''
             };
         }
@@ -2409,7 +2455,7 @@ Use these subtitles:
         customItem.appendChild(customMark);
 
         const customLabel = document.createElement('span');
-        customLabel.textContent = 'Свой запрос';
+        customLabel.textContent = t('customPrompt');
         customItem.appendChild(customLabel);
 
         customItem.addEventListener('click', () => {
@@ -2460,7 +2506,7 @@ Use these subtitles:
         const customPrompt = promptTextarea.value.trim();
         if (!customPrompt) {
             log('handleCustomPromptExecuteBtn: empty custom prompt');
-            alert('Введите текст запроса');
+            alert(t('customPromptAlertEmpty'));
             return;
         }
 
@@ -2520,11 +2566,11 @@ Use these subtitles:
                 }
                 log('handleCustomPromptExecuteBtn: sending to API', {usedPlaceholders: selected});
                 sendToAPI({...videoData, customPrompt: fullPrompt}).catch(error => {
-                    showError(error.message || 'Ошибка при обработке запроса');
+                    showError(error.message || t('requestError'));
                     log('handleCustomPromptExecuteBtn: sendToAPI error', error, 'error');
                 });
             }).catch(error => {
-                showError(error.message || 'Ошибка при обработке запроса');
+                showError(error.message || t('requestError'));
                 log('handleCustomPromptExecuteBtn: getVideoFullData error', error, 'error');
             });
         });
@@ -2550,7 +2596,7 @@ Use these subtitles:
             closeBtn.className = 'modal-close';
             closeBtn.type = 'button';
             closeBtn.textContent = '×';
-            closeBtn.title = 'Закрыть';
+            closeBtn.title = t('customPromptBtnClose');
             closeBtn.onclick = () => {
                 log('showCustomPromptModal: close clicked');
                 modal.remove();
@@ -2558,40 +2604,40 @@ Use these subtitles:
 
             const title = document.createElement('div');
             title.className = 'modal-title';
-            title.textContent = 'Свой запрос';
+            title.textContent = t('customPrompt');
 
             const promptLabel = document.createElement('label');
-            promptLabel.textContent = 'Текст запроса:';
+            promptLabel.textContent = t('customPromptLabel');
 
             const promptTextarea = document.createElement('textarea');
-            promptTextarea.placeholder = 'Введите ваш запрос к LLM...';
+            promptTextarea.placeholder = t('customPromptPlaceholder');
 
             const settings = loadSettings();
             promptTextarea.value = settings.customPromptText || '';
 
             const placeholdersLabel = document.createElement('label');
-            placeholdersLabel.textContent = 'Добавить к запросу данные:';
+            placeholdersLabel.textContent = t('customPromptInclude');
 
             const placeholdersContainer = document.createElement('div');
             placeholdersContainer.className = 'placeholders-container';
 
             const placeholders = [
                 {
-                    key: 'subtitles', label: 'Субтитры', options: [
-                        {value: 'subtitlesText', label: 'Субтитры (только текст)'},
-                        {value: 'subtitlesFull', label: 'Субтитры (с таймкодами)'}
+                    key: 'subtitles', label: t('customPromptPlaceholderSubtitles'), options: [
+                        {value: 'subtitlesText', label: t('customPromptPlaceholderSubtitlesText')},
+                        {value: 'subtitlesFull', label: t('customPromptPlaceholderSubtitlesFull')}
                     ]
                 },
-                {key: 'episodes', label: 'Эпизоды (с таймкодами)'},
-                {key: 'title', label: 'Название видео'},
-                {key: 'shortDescription', label: 'Описание видео'},
-                {key: 'channelName', label: 'Название канала'},
-                {key: 'publishDate', label: 'Дата публикации'},
-                {key: 'lengthSeconds', label: 'Длительность'},
-                {key: 'category', label: 'Категория'},
-                {key: 'keywords', label: 'Ключевые слова'},
-                {key: 'videoUrl', label: 'Ссылка на видео'},
-                {key: 'thumbnailUrl', label: 'Ссылка на превью'},
+                {key: 'episodes', label: t('customPromptPlaceholderEpisodes')},
+                {key: 'title', label: t('customPromptPlaceholderTitle')},
+                {key: 'shortDescription', label: t('customPromptPlaceholderShortDescription')},
+                {key: 'channelName', label: t('customPromptPlaceholderChannelName')},
+                {key: 'publishDate', label: t('customPromptPlaceholderPublishDate')},
+                {key: 'lengthSeconds', label: t('customPromptPlaceholderLengthSeconds')},
+                {key: 'category', label: t('customPromptPlaceholderCategory')},
+                {key: 'keywords', label: t('customPromptPlaceholderKeywords')},
+                {key: 'videoUrl', label: t('customPromptPlaceholderVideoUrl')},
+                {key: 'thumbnailUrl', label: t('customPromptPlaceholderThumbnailUrl')},
             ];
 
             const savedPlaceholders = settings.customPromptPlaceholders;
@@ -2634,7 +2680,7 @@ Use these subtitles:
             btnBlock.style.marginTop = "10px";
 
             const executeBtn = document.createElement('button');
-            executeBtn.textContent = 'Выполнить';
+            executeBtn.textContent = t('customPromptBtnExecute');
             executeBtn.className = 'custom-execute-btn';
             executeBtn.disabled = promptTextarea.value.trim() === '';
             executeBtn.style.transition = "background .18s, opacity .18s";
@@ -2673,7 +2719,7 @@ Use these subtitles:
             styleExecuteBtn();
 
             const resetBtn = document.createElement('button');
-            resetBtn.textContent = 'Сброс';
+            resetBtn.textContent = t('customPromptBtnReset');
             resetBtn.type = 'button';
             resetBtn.className = 'custom-execute-btn custom-reset-btn';
             resetBtn.style.background = '#762c83';
