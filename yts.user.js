@@ -8,7 +8,7 @@
 // @icon           https://www.youtube.com/favicon.ico
 // @author         Reydan46
 // @namespace      yts
-// @version        0.8.9
+// @version        0.9.0
 // @homepageURL    https://github.com/Reydan46/youtube-summary-button
 // @supportURL     https://github.com/Reydan46/youtube-summary-button/issues
 // @updateURL      https://raw.githubusercontent.com/Reydan46/youtube-summary-button/main/yts.user.js
