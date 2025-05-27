@@ -52,6 +52,257 @@
     let currentResult = "";
     let globalVideoData = {};
 
+    const TRANSLATIONS = {
+        ru: {
+            // Кнопки и заголовки
+            minimize: 'Свернуть',
+            expand: 'Развернуть',
+            processing: 'Выполняется...',
+            done: 'Готово',
+            error: 'Ошибка:',
+            settings: 'Настройки',
+            save: 'Сохранить',
+            close: 'Закрыть',
+            exportBtn: 'Экспорт...',
+            resetBtn: 'Сброс...',
+            bearerTitle: 'Ключ API',
+            timeoutTitle: 'Таймаут ответа (мс)',
+            modelTitle: 'Модель:',
+            saveChanges: 'Сохранить изменения',
+            noChanges: 'Нет изменений',
+            generate: 'Генерировать',
+
+            // Настройки
+            prompts: 'Промпты',
+            promptHelpBtn: 'Справка: плейсхолдеры и промпты',
+            addPrompt: 'Добавить промпт',
+            promptNamePlaceholder: 'Название действия',
+            promptTextPlaceholder: 'Текст промпта',
+            previewPrompt: 'Показать итоговый промпт с подставленными реальными переменными',
+            deletePrompt: 'Удалить этот промпт',
+
+            // Копирование
+            copyResult: 'Копировать результат',
+            copySubtitles: 'Копировать субтитры',
+
+            // Сообщения
+            noChanges: 'Нет изменений',
+            unsavedChanges: 'Есть несохранённые изменения',
+            invalidUrl: 'Некорректный URL',
+            minOnePrompt: 'Требуется минимум один промпт',
+            allPromptsFilled: 'Все промпты должны иметь название и текст',
+
+            // Ошибки
+            timeout: 'Превышено время ожидания ответа от API (',
+            apiError: 'Ошибка генерации ответа от LLM',
+            noStreamSupport: 'Нет поддержки стриминга у fetch',
+            invalidJson: 'Ошибка парсинга потока - Некорректный JSON:',
+            extractionError: 'Не удалось извлечь текст из субтитров',
+            jsonParsingError: 'Ошибка разбора JSON файла: ',
+            settingsImportError: 'Ошибка импорта настроек: ',
+
+            // Утилиты настроек
+            resetPrompts: 'Сбросить промпты',
+            resetOtherSettings: 'Сбросить остальные настройки',
+            resetAll: 'Сбросить всё',
+            exportPrompts: 'Экспорт промптов',
+            exportSettings: 'Экспорт настроек',
+            exportAll: 'Экспорт всего',
+            import: 'Импорт',
+            
+            // Документация промптов
+            promptIntro:
+                'Промпт — это шаблон для LLM (ChatGPT/Claude и др.), где вы используете специальные переменные (плейсхолдеры) для подстановки реальных данных о видео: субтитров, заголовка, описания и других метаданных.',
+            promptEachPlaceholder:
+                'Каждый плейсхолдер заменяется на соответствующее значение из текущего видео.',
+            promptPlaceholderFormat1: 'Плейсхолдеры записываются в формате',
+            promptPlaceholderFormat2: '{{название}}',
+            promptPlaceholderFormat3: ' — например, ',
+            promptPlaceholderChain1:
+                 'Можно применять к плейсхолдерам цепочку операций через двоеточие: ',
+            promptPlaceholderChain2: '{{название:операция1(...),операция2(...)}}',
+            promptPlaceholderChain3: ', все операции выполняются по порядку.',
+            promptGroupPlaceholder1: 'Для сложных шаблонов используйте групповой плейсхолдер ',
+            promptGroupPlaceholder2: ', который выводит сразу все основные параметры видео.',
+            promptAdvancedFieldControl1: 'Гибко управляйте полями в ',
+            promptAdvancedFieldControl2: ': можно перечислить только нужные (',
+            promptAdvancedFieldControl3: '), или исключить некоторые (',
+            promptPhHeader: 'Поддерживаемые плейсхолдеры:',
+            promptPhTh1: 'Плейсхолдер',
+            promptPhTh2: 'Значение',
+            promptOpHeader: 'Доступные операции для обработки значения:',
+            promptEgHeader: 'Примеры использования:',
+            promptOpTh1: 'Операция',
+            promptOpTh2: 'Описание',
+            promptEgTh1: 'Шаблон',
+            promptEgTh2: 'Результат',
+            promptPlaceholderSubtitlesText: 'Текст всех субтитров (без таймкодов, одним блоком).',
+            promptPlaceholderSubtitlesFull: 'Субтитры с разметкой времени (таймкоды в начале каждой строки).',
+            promptPlaceholderTitle: 'Название видео.',
+            promptPlaceholderShortDescription: 'Короткое описание видео.',
+            promptPlaceholderPublishDate: 'Дата публикации.',
+            promptPlaceholderLengthSeconds: 'Длительность видео в секундах.',
+            promptPlaceholderChannelName: 'Название канала.',
+            promptPlaceholderCategory: 'Категория на YouTube.',
+            promptPlaceholderVideoUrl: 'Ссылка на видео.',
+            promptPlaceholderThumbnailUrl: 'Ссылка на изображение превью.',
+            promptPlaceholderKeywords: 'Ключевые слова (список, через запятую).',
+            promptPlaceholderVideoData: 'Все параметры видео списком вида "ключ: значение".',
+            promptOpReplace: 'замена всех вхождений "a" на "b" в строке',
+            promptOpLower: 'преобразовать в нижний регистр',
+            promptOpUpper: 'преобразовать в верхний регистр',
+            promptOpTrim: 'убрать пробелы по краям строки',
+            promptOpCapitalize: 'первая буква заглавная, остальные маленькие',
+            promptOpSplit: 'разбить строку на массив по разделителю',
+            promptOpJoin: 'объединить массив строк в строку через разделитель',
+            promptOpSort: 'отсортировать массив',
+            promptOpLength: 'длина строки или массива',
+            promptOpSlice: 'получить часть строки или массива',
+            promptExVideoDataFields: 'только название видео и дата публикации',
+            promptExKeywordSort: 'три первых ключевых слова в алфавитном порядке',
+            promptExTitleFormat: 'название видео, в нижнем регистре и без пробелов',
+            promptTip: 'Совет: ',
+            promptPreviewNote: 'Используйте предпросмотр (👁️ в настройках промпта), чтобы увидеть, как данные подставляются в шаблон.',
+
+            // Прочее
+            testTitle: 'Проверка промпта (реальные данные)',
+            textareaLoading: 'Загрузка данных видео...',
+            textareaError: 'Ошибка получения данных:\n',
+            modelBtnGetModels: 'Получить список моделей с сервера',
+            modelBtnLoading: 'Загрузка...',
+            alertApiUrl: 'Укажите API URL',
+            alertBearer: 'Укажите Bearer-токен',
+            alertNoModels: 'Сервер не вернул ни одной модели',
+            alertModelsError: 'Ошибка получения моделей: ',
+            modelBtnGetModelsFinal: 'Получить список моделей',
+        },
+        en: {
+            // Buttons and headers
+            minimize: 'Minimize',
+            expand: 'Expand',
+            processing: 'Processing...',
+            done: 'Done',
+            error: 'Error:',
+            settings: 'Settings',
+            save: 'Save',
+            close: 'Close',
+            exportBtn: 'Export...',
+            resetBtn: 'Reset...',
+            bearerTitle: 'API Key',
+            timeoutTitle: 'Request timeout (ms)',
+            modelTitle: 'Model:',
+            saveChanges: 'Save changes',
+            noChanges: 'No changes',
+            generate: 'Generate',
+
+            // Settings
+            prompts: 'Prompts',
+            promptHelpBtn: 'Prompt & placeholder help',
+            addPrompt: 'Add prompt',
+            promptNamePlaceholder: 'Action name',
+            promptTextPlaceholder: 'Prompt text',
+            previewPrompt: 'Show final prompt with real variables',
+            deletePrompt: 'Delete this prompt',
+
+            // Copy buttons
+            copyResult: 'Copy result',
+            copySubtitles: 'Copy subtitles',
+
+            // Messages
+            noChanges: 'No changes',
+            unsavedChanges: 'You have unsaved changes',
+            invalidUrl: 'Invalid URL',
+            minOnePrompt: 'At least one prompt is required',
+            allPromptsFilled: 'All prompts must have a name and text',
+
+            // Errors
+            timeout: 'API response timeout (',
+            apiError: 'LLM generation error',
+            noStreamSupport: 'No streaming support in fetch',
+            invalidJson: 'Stream parsing error - Invalid JSON:',
+            extractionError: 'Failed to extract text from subtitles',
+            jsonParsingError: 'JSON file parsing error: ',
+            settingsImportError: 'Settings import error: ',
+
+            // Settings utilities
+            resetPrompts: 'Reset prompts',
+            resetOtherSettings: 'Reset other settings',
+            resetAll: 'Reset all',
+            exportPrompts: 'Export prompts',
+            exportSettings: 'Export settings',
+            exportAll: 'Export all',
+            import: 'Import',
+
+            // Prompt documentation
+            promptIntro:
+                'A prompt is a template for LLMs (ChatGPT/Claude, etc.), where you use special variables (placeholders) to substitute real data about the video: subtitles, title, description, and other metadata.',
+            promptEachPlaceholder:
+                'Each placeholder is replaced with the corresponding value from the current video.',
+            promptPlaceholderFormat1: 'Placeholders are written in the format',
+            promptPlaceholderFormat2: '{{name}}',
+            promptPlaceholderFormat3: ' — for example, ',
+            promptPlaceholderChain1:
+                'You can apply a chain of operations to placeholders using a colon: ',
+            promptPlaceholderChain2: '{{name:operation1(...),operation2(...)}}',
+            promptPlaceholderChain3: ', all operations are performed in order.',
+            promptGroupPlaceholder1: 'For complex templates, use the group placeholder ',
+            promptGroupPlaceholder2: ', which outputs all key video parameters at once.',
+            promptAdvancedFieldControl1: 'Control fields flexibly in ',
+            promptAdvancedFieldControl2: ': you can list only those you need (',
+            promptAdvancedFieldControl3: '), or exclude some (',
+            promptPhHeader: 'Supported placeholders:',
+            promptPhTh1: 'Placeholder',
+            promptPhTh2: 'Value',
+            promptOpHeader: 'Available value operations:',
+            promptEgHeader: 'Examples of usage:',
+            promptOpTh1: 'Operation',
+            promptOpTh2: 'Description',
+            promptEgTh1: 'Template',
+            promptEgTh2: 'Result',
+            promptPlaceholderSubtitlesText: 'All subtitles as plain text (no timecodes, single block).',
+            promptPlaceholderSubtitlesFull: 'Subtitles with time markup (timecodes at the start of each line).',
+            promptPlaceholderTitle: 'Video title.',
+            promptPlaceholderShortDescription: 'Short video description.',
+            promptPlaceholderPublishDate: 'Date of publishing.',
+            promptPlaceholderLengthSeconds: 'Video duration in seconds.',
+            promptPlaceholderChannelName: 'Channel name.',
+            promptPlaceholderCategory: 'YouTube category.',
+            promptPlaceholderVideoUrl: 'Video link.',
+            promptPlaceholderThumbnailUrl: 'Thumbnail image url.',
+            promptPlaceholderKeywords: 'Keywords (comma-separated list).',
+            promptPlaceholderVideoData: 'All video properties as a "key: value" list.',
+            promptOpReplace: 'replace all occurrences of "a" with "b" in the string',
+            promptOpLower: 'convert to lowercase',
+            promptOpUpper: 'convert to uppercase',
+            promptOpTrim: 'remove whitespace from start and end',
+            promptOpCapitalize: 'capitalize first letter, make others lowercase',
+            promptOpSplit: 'split string to array by separator',
+            promptOpJoin: 'join array of strings into string using separator',
+            promptOpSort: 'sort array',
+            promptOpLength: 'length of a string or array',
+            promptOpSlice: 'get part of string or array',
+            promptExVideoDataFields: 'video title and publish date only',
+            promptExKeywordSort: 'first three keywords in alphabetical order',
+            promptExTitleFormat: 'video title, in lowercase and with no spaces',
+            promptTip: 'Tip: ',
+            promptPreviewNote: 'Use preview mode (👁️ in the prompt settings) to see how data is substituted in the template.',
+
+            // Misc
+            testTitle: 'Prompt check (real data)',
+            textareaLoading: 'Loading video data...',
+            textareaError: 'Error fetching data:\n',
+            modelBtnGetModels: 'Get model list from server',
+            modelBtnLoading: 'Loading...',
+            alertApiUrl: 'Specify API URL',
+            alertBearer: 'Specify Bearer token',
+            alertNoModels: 'Server did not return any models',
+            alertModelsError: 'Error fetching models: ',
+            modelBtnGetModelsFinal: 'Get model list',
+        }
+    };
+
+    let currentLang = null; // Глобальная переменная для хранения текущего языка
+
     // === Перечисление SVG-иконок ===
     const ICONS = {
     COPY: {
@@ -85,7 +336,7 @@
 };
 
     // === Стейт/настройки по-умолчанию ===
-    const DEFAULT_PROMPTS = [
+    const DEFAULT_PROMPTS_RU = [
         {
             id: 'summary',
             title: "Краткий пересказ",
@@ -160,9 +411,96 @@ A: [Ответ]
 {{subtitlesText}}`
         },
     ];
+
+    const DEFAULT_PROMPTS_EN = [
+    {
+        id: 'summary',
+        title: "Brief summary",
+        prompt: `You are an assistant specialized in video content analysis. Analyze the provided subtitles and create a concise summary of the video's content.
+
+Your task is to capture the essence of each meaningful segment or section of the video, conveying the main ideas and events as succinctly as possible.
+For each block, use no more than one short sentence. Do not copy the subtitle text; rephrase the information in your own words.
+Avoid unnecessary details and secondary descriptions. Strictly maintain the original sequence, so the summary reflects the structure of the source material.
+Format your answer as plain text without lists, timestamps, or any other special formatting; start a new segment from a new line.
+Do not add any explanations, conclusions, introductions, or extra information beyond the brief summary.
+
+Use these subtitles:
+{{subtitlesText}}`
+    },
+    {
+        id: 'article',
+        title: "Article-outline",
+        prompt: `You are a video content analysis assistant. Analyze the provided subtitles from a technical video and generate a full article in markdown format using the information in the subtitles.
+
+Present the text as if it's a scientific/technical article, minimizing lists and using them only if an important enumeration is required.
+Avoid using phrases like "the author says" or similar in the article.
+
+Below is the required structure.
+# Brief summary
+[Write 3-5 sentences describing the main idea of the video here]
+
+# Main information
+[Provide a detailed outline, with as much information as possible on each subtopic. Do not add anything from yourself, only process information from the subtitles. Use H headers (with appropriate level, up to H3) to highlight each subtopic.
+Try to minimize the amount of code blocks; use them only when necessary to maintain readability.]
+
+Use these subtitles:
+{{subtitlesText}}`
+    },
+    {
+        id: 'moments',
+        title: "Key moments",
+        prompt: `You are an assistant for video content analysis. Please follow the instructions below:
+
+Analyze the provided subtitles and highlight only the most important moments (key events, plot twists, discoveries, conclusions, logical blocks) relevant for the viewer.
+For each moment, indicate only the original timestamp found at the beginning of the corresponding subtitle line exactly as it appears there (e.g., [00:10.12] or [00:15:09]).
+Do not invent, compute, modify, or round timestamps—only use the original timestamps as found in the beginning of the subtitle lines.
+If you need the moment to start a bit earlier, choose the previous available timestamp from the subtitles, but only use those actually present in the original subtitle lines, not made up.
+Do not skip or replace any subtitle timestamp with your own ranges or numbers.
+For each key moment, give a concise and brief description, in your own words — do not copy or quote phrases from the subtitles.
+Do not add any explanations, introductions, conclusions, or any other text — only the list of key moments.
+Do not reveal essential plot twists, endings, major intrigues or unexpected developments that might spoil the viewing experience. When describing such moments, limit yourself to only a hint about the event or describe it without specific outcome or details.
+
+Output format:
+[timestamp] — description
+[timestamp] — description
+[timestamp] — description
+and so on, each moment on a new line.
+
+Use these subtitles:
+{{subtitlesFull}}`
+    },
+    {
+        id: 'faq',
+        title: "Questions & Answers",
+        prompt: `You are a technical assistant.
+Analyze the subtitles of a technical video and create a FAQ (questions and answers) on the main topics, using only the information present in the subtitles. 
+Each question and answer should be brief and to the point.
+Do not add anything beyond what is contained in the subtitles or make up information.
+
+Output format:
+
+Q: [A short, specific question based on main topics found in subtitles]
+A: [A short, specific answer, strictly based on the subtitles]
+
+Q: [Question]
+A: [Answer]
+
+(Each "question-answer" pair should always start from a new line. No explanations, introductory, or concluding text.)
+
+Use these subtitles:
+{{subtitlesText}}`
+    }
+];
+
+    function getDefaultPromptsForLang(lang) {
+        return lang === 'en' ? DEFAULT_PROMPTS_EN : DEFAULT_PROMPTS_RU;
+    }
+
     const DEFAULT_SETTINGS = {
-        prompts: DEFAULT_PROMPTS,
-        activePromptId: DEFAULT_PROMPTS[0].id,
+        //prompts: DEFAULT_PROMPTS,
+        prompts: getDefaultPromptsForLang(initLanguage()),
+        //activePromptId: DEFAULT_PROMPTS[0].id,
+        activePromptId: getDefaultPromptsForLang(initLanguage())[0].id,
         timeout: 180000,
         url: 'https://api.openai.com/v1/chat/completions',
         token: '',
@@ -936,6 +1274,29 @@ A: [Ответ]
     }
 
     /**
+     * Инициализация языка интерфейса
+     * @return {string} Код языка ('ru' или 'en')
+     */
+    function initLanguage() {
+        if (currentLang !== null) return currentLang;
+        const browserLang = navigator.language || navigator.userLanguage;
+        currentLang = browserLang.toLowerCase().startsWith('ru') ? 'ru' : 'en';
+        log('Language initialized:', currentLang);
+        return currentLang;
+    }
+
+    function t(key, ...args) {
+        const lang = currentLang || initLanguage();
+        let text = TRANSLATIONS[lang]?.[key] || TRANSLATIONS.en[key] || key;
+        if (args.length) {
+            args.forEach((arg, i) => {
+                text = text.replace(`{${i}}`, arg);
+            });
+        }
+        return text;
+    }
+
+    /**
      * Определяет имя вызывающей функции для логирования
      *
      * @return {string} Имя функции-вызывателя или 'global'
@@ -1129,7 +1490,7 @@ A: [Ответ]
             const merged = Object.assign({}, DEFAULT_SETTINGS, JSON.parse(data) || {});
             if (!Array.isArray(merged.prompts) || merged.prompts.length === 0) {
                 log('Prompts are missing or corrupt in settings, restoring defaults');
-                merged.prompts = [...DEFAULT_PROMPTS];
+                merged.prompts = [...getDefaultPromptsForLang(initLanguage())];
             }
             merged.prompts.forEach(p => {
                 if (!p.id) p.id = genPromptId();
@@ -1215,7 +1576,7 @@ A: [Ответ]
     function appendMinimizeButtons(resultContainer) {
         if (!resultContainer || resultContainer.querySelector('.yts-min-btn')) return;
 
-        const minBtn = createTextButton('Свернуть', 'yts-min-btn', () => {
+        const minBtn = createTextButton(t('minimize'), 'yts-min-btn', () => {
             minimizeResultContainer();
             log('Result container minimized by user');
         });
@@ -1244,7 +1605,7 @@ A: [Ответ]
         }
 
         if (!resultContainer.querySelector('.yts-more-btn')) {
-            const moreBtn = createTextButton('Развернуть', 'yts-more-btn', restoreResultContainer);
+            const moreBtn = createTextButton(t('expand'), 'yts-more-btn', restoreResultContainer);
             resultContainer.appendChild(moreBtn);
             log('Expand button added to minimized container');
         } else {
@@ -1298,7 +1659,7 @@ A: [Ответ]
         groupDiv.className = 'yts-copy-btn-group';
 
         const btnCopySummary = createButtonIcon({
-            title: 'Копировать результат',
+            title: t('copyResult'),
             icon: ICONS.COPY,
             onClick: function () {
                 GM_setClipboard(currentResult, 'text');
@@ -1309,7 +1670,7 @@ A: [Ответ]
         groupDiv.appendChild(btnCopySummary);
 
         const btnCopySubs = createButtonIcon({
-            title: 'Копировать субтитры',
+            title: t('copySubtitles'),
             icon: ICONS.SUBTITLES,
             onClick: function (evt) {
                 if (evt.button === 0) {
@@ -1418,7 +1779,7 @@ A: [Ответ]
 
         const title = document.createElement('div');
         title.className = 'result-title';
-        title.textContent = 'Ошибка:';
+        title.textContent = t('error');
         titleRow.appendChild(title);
 
         container.appendChild(titleRow);
@@ -1730,7 +2091,7 @@ A: [Ответ]
         const {subtitlesText, subtitlesFull} = extractTextFromSubtitleXml(subtitleXml);
         if (!subtitlesText) {
             log('Failed to extract subtitles text', null, 'error');
-            throw new Error('Не удалось извлечь текст из субтитров');
+            throw new Error(t('extractionError'));
         }
         if (subtitlesText.length < 10) {
             log('Subtitles too short or empty', {length: subtitlesText.length}, 'error');
@@ -1783,7 +2144,7 @@ A: [Ответ]
 
         const title = document.createElement('div');
         title.className = 'result-title';
-        title.textContent = loading ? 'Выполняется...' : 'Готово';
+        title.textContent = loading ? t('processing') : t('done');
         titleRow.appendChild(title);
         container.appendChild(titleRow);
 
@@ -1822,7 +2183,7 @@ A: [Ответ]
             item.appendChild(mark);
 
             const labelNode = document.createElement('span');
-            labelNode.textContent = p.title || '(без названия)';
+            labelNode.textContent = p.title || '(no title)';
             item.appendChild(labelNode);
 
             item.addEventListener('click', () => {
@@ -1845,7 +2206,7 @@ A: [Ответ]
         settingsItem.appendChild(mark);
 
         const settingsLabel = document.createElement('span');
-        settingsLabel.textContent = 'Настройки';
+        settingsLabel.textContent = t('settings');
         settingsItem.appendChild(settingsLabel);
 
         settingsItem.addEventListener('click', () => {
@@ -1909,7 +2270,7 @@ A: [Ответ]
         const btn = q(`#${BTN_ID}`);
         const active = getActivePrompt();
         if (btn && active && btn.textContent !== active.title) {
-            btn.textContent = active.title || 'Генерировать';
+            btn.textContent = active.title || t('generate');
             log('Button title updated', {title: btn.textContent});
         }
     }
@@ -1994,13 +2355,13 @@ A: [Ответ]
 
         const title = document.createElement('div');
         title.className = "modal-title";
-        title.textContent = 'Выбор модели';
+        title.textContent = t('modelTitle');
 
         const closeBtn = document.createElement('button');
         closeBtn.className = 'modal-close';
         closeBtn.type = 'button';
         closeBtn.textContent = '×';
-        closeBtn.title = 'Закрыть';
+        closeBtn.title = t('close');
         closeBtn.onclick = () => modal.remove();
 
         topBar.appendChild(title);
@@ -2242,7 +2603,7 @@ A: [Ответ]
      */
     function addSettingsUtilityButtons(formActionsRow, setSettingsForm) {
         const btnReset = createButton({
-            text: 'Сброс ...',
+            text: t('resetBtn'),
             onClick: function (e) {
                 e.preventDefault();
                 const rect = btnReset.getBoundingClientRect();
@@ -2250,19 +2611,19 @@ A: [Ответ]
                     rect.left, rect.bottom,
                     [
                         {
-                            label: 'Сбросить промпты',
+                            label: t('resetPrompts'),
                             onClick: () => {
                                 log('Settings modal: reset PROMPTS');
                                 const last = loadSettings();
                                 const newSettings = {
                                     ...last,
-                                    prompts: DEFAULT_PROMPTS
+                                    prompts: getDefaultPromptsForLang(initLanguage())
                                 };
                                 setSettingsForm(newSettings);
                             }
                         },
                         {
-                            label: 'Сбросить остальные настройки',
+                            label: t('resetOtherSettings'),
                             onClick: () => {
                                 log('Settings modal: reset PREFS');
                                 const last = loadSettings();
@@ -2275,7 +2636,7 @@ A: [Ответ]
                         },
                         null,
                         {
-                            label: 'Сбросить всё',
+                            label: t('resetAll'),
                             onClick: () => {
                                 log('Settings modal: reset ALL');
                                 setSettingsForm(DEFAULT_SETTINGS);
@@ -2289,7 +2650,7 @@ A: [Ответ]
         formActionsRow.appendChild(btnReset);
 
         const btnExport = createButton({
-            text: 'Экспорт ...',
+            text: t('exportBtn'),
             onClick: function (e) {
                 e.preventDefault();
                 const rect = btnExport.getBoundingClientRect();
@@ -2301,20 +2662,20 @@ A: [Ответ]
                 });
                 showContextMenuUniversal(rect.left, rect.bottom, [
                     {
-                        label: 'Экспорт промптов',
+                        label: t('exportPrompts'),
                         onClick: () => {
                             saveJSONToFile({prompts}, 'yts_prompts.json');
                         }
                     },
                     {
-                        label: 'Экспорт настроек',
+                        label: t('exportSettings'),
                         onClick: () => {
                             saveJSONToFile(prefs, 'yts_settings.json');
                         }
                     },
                     null,
                     {
-                        label: 'Экспорт всего',
+                        label: t('exportAll'),
                         onClick: () => {
                             saveJSONToFile(settings, 'yts_full_export.json');
                         }
@@ -2326,7 +2687,7 @@ A: [Ответ]
         formActionsRow.appendChild(btnExport);
 
         const btnImport = createButton({
-            text: 'Импорт',
+            text: t('import'),
             onClick: function () {
                 importFromFile(setSettingsForm);
             }
@@ -2334,7 +2695,7 @@ A: [Ответ]
         btnImport.className = 'modal-btn import';
         formActionsRow.appendChild(btnImport);
 
-        const btnSave = createButton({text: 'Сохранить'});
+        const btnSave = createButton({text: t('save')});
         btnSave.className = 'modal-btn save';
         btnSave.type = 'submit';
         formActionsRow.appendChild(btnSave);
@@ -2358,11 +2719,11 @@ A: [Ответ]
                 }
             });
             closeBtn.className = 'modal-close';
-            closeBtn.title = 'Закрыть';
+            closeBtn.title = t('close');
 
             const title = document.createElement('div');
             title.className = 'modal-title';
-            title.textContent = 'Настройки';
+            title.textContent = t('settings');
 
             const form = document.createElement('form');
 
@@ -2396,9 +2757,9 @@ A: [Ответ]
             }
 
             const settingRows = [];
-            settingRows.push(makeRow('API URL (LLM):', 'yts-setting-url', 'text', '', {}));
-            settingRows.push(makeRow('Bearer-токен (для API):', 'yts-setting-token', 'password', '', {autocomplete: 'off'}));
-            settingRows.push(makeRow('Таймаут ответа (мс):', 'yts-setting-timeout', 'number', '', {
+            settingRows.push(makeRow('API Endpoint (LLM):', 'yts-setting-url', 'text', '', {}));
+            settingRows.push(makeRow(t('bearerTitle'), 'yts-setting-token', 'password', '', {autocomplete: 'off'}));
+            settingRows.push(makeRow(t('timeoutTitle'), 'yts-setting-timeout', 'number', '', {
                 min: 10000,
                 step: 1000
             }));
@@ -2409,7 +2770,7 @@ A: [Ответ]
             modelRow.style.marginBottom = "6px";
 
             const modelLabel = document.createElement("label");
-            modelLabel.textContent = "Модель:";
+            modelLabel.textContent = t('modelTitle');
             modelLabel.htmlFor = "yts-setting-model";
             modelLabel.style.flex = "0 0 auto";
             modelLabel.style.minWidth = "155px";
@@ -2424,27 +2785,27 @@ A: [Ответ]
 
             const modelBtn = document.createElement('button');
             modelBtn.type = 'button';
-            modelBtn.title = 'Получить список моделей с сервера';
+            modelBtn.title = t('modelBtnGetModels');
             modelBtn.className = 'prompt-btn model-select-btn';
             modelBtn.textContent = "▼";
             modelBtn.addEventListener('click', async function () {
                 modelBtn.disabled = true;
-                modelBtn.title = "Загрузка...";
+                modelBtn.title = t('modelBtnLoading');
                 const apiUrl = q("#yts-setting-url").value;
                 const apiToken = q("#yts-setting-token").value;
                 try {
                     if (!apiUrl) {
-                        alert("Укажите API URL");
+                        alert(t('alertApiUrl'));
                         return;
                     }
                     if (!apiToken) {
-                        alert("Укажите Bearer-токен");
+                        alert(t('alertBearer'));
                         return;
                     }
                     const models = await fetchLLMModels(apiUrl, apiToken);
 
                     if (!models.length) {
-                        alert("Сервер не вернул ни одной модели");
+                        alert(t('alertNoModels'));
                         return;
                     }
                     showModelsSelectModal(models, m => {
@@ -2452,10 +2813,10 @@ A: [Ответ]
                         setTimeout(applyValidation, 14);
                     });
                 } catch (e) {
-                    alert("Ошибка получения моделей: " + (e.message || e));
+                    alert(t('alertModelsError') + (e.message || e));
                 } finally {
                     modelBtn.disabled = false;
-                    modelBtn.title = "Получить список моделей";
+                    modelBtn.title = t('modelBtnGetModelsFinal');
                 }
             });
             modelRow.appendChild(modelBtn);
@@ -2532,7 +2893,7 @@ A: [Ответ]
 
             const title = document.createElement('div');
             title.className = 'modal-title';
-            title.textContent = 'Справка: промпты и плейсхолдеры';
+            title.textContent = t('promptHelpBtn');
 
             const closeBtn = createButton({
                 text: '×',
@@ -2541,7 +2902,7 @@ A: [Ответ]
                 }
             });
             closeBtn.className = 'modal-close';
-            closeBtn.title = 'Закрыть';
+            closeBtn.title = t('close');
 
             topBar.appendChild(title);
             topBar.appendChild(closeBtn);
@@ -2555,36 +2916,34 @@ A: [Ответ]
             instruction.style.marginTop = '8px';
 
             const intro1 = document.createElement('p');
-            intro1.textContent =
-                'Промпт — это шаблон для LLM (ChatGPT/Claude и др.), ' +
-                'где вы используете специальные переменные (плейсхолдеры) для подстановки реальных данных о видео: субтитров, заголовка, описания и других метаданных.';
+            intro1.textContent = t('promptIntro');
 
             const instructionsList = document.createElement('ul');
             const instructions = [
-                {text: 'Каждый плейсхолдер заменяется на соответствующее значение из текущего видео.'},
+                {text: t('promptEachPlaceholder')},
                 {
-                    text: 'Плейсхолдеры записываются в формате ',
-                    bold: '{{название}}',
-                    after: ' — например, ',
+                    text: t('promptPlaceholderFormat1'),
+                    bold: t('promptPlaceholderFormat2'),
+                    after: t('promptPlaceholderFormat3'),
                     bold2: '{{title}}',
                     after2: '.'
                 },
                 {
-                    text: 'Можно применять к плейсхолдерам цепочку операций через двоеточие: ',
-                    bold: '{{название:операция1(...),операция2(...)}}',
-                    after: ', все операции выполняются по порядку.'
+                    text: t('promptPlaceholderChain1'),
+                    bold: t('promptPlaceholderChain2'),
+                    after: t('promptPlaceholderChain3')
                 },
                 {
-                    text: 'Для сложных шаблонов используйте групповой плейсхолдер ',
+                    text: t('promptGroupPlaceholder1'),
                     bold: '{{videoData}}',
-                    after: ', который выводит сразу все основные параметры видео.'
+                    after: t('promptGroupPlaceholder2')
                 },
                 {
-                    text: 'Гибко управляйте полями в ',
+                    text: t('promptAdvancedFieldControl1'),
                     bold: '{{videoData}}',
-                    after: ': можно перечислить только нужные (',
+                    after: t('promptAdvancedFieldControl2'),
                     bold2: '{{videoData:+title,publishDate}}',
-                    after2: '), или исключить некоторые (',
+                    after2: t('promptAdvancedFieldControl3'),
                     bold3: '{{videoData:-thumbnailUrl}}',
                     after3: ').'
                 }
@@ -2616,7 +2975,7 @@ A: [Ответ]
             const phHeader = document.createElement('b');
             phHeader.style.display = "block";
             phHeader.style.marginTop = "12px";
-            phHeader.textContent = 'Поддерживаемые плейсхолдеры:';
+            phHeader.textContent = t('promptPhHeader');
 
             const phTable = document.createElement('table');
             phTable.className = 'yts-doc-table';
@@ -2625,26 +2984,26 @@ A: [Ответ]
 
             const ph_trh = document.createElement('tr');
             const ph_th1 = document.createElement('th');
-            ph_th1.textContent = 'Плейсхолдер';
+            ph_th1.textContent = t('promptPhTh1');
             const ph_th2 = document.createElement('th');
-            ph_th2.textContent = 'Значение';
+            ph_th2.textContent = t('promptPhTh2');
             ph_trh.appendChild(ph_th1);
             ph_trh.appendChild(ph_th2);
             phTable.appendChild(ph_trh);
 
             [
-                {code: '{{subtitlesText}}', desc: 'Текст всех субтитров (без таймкодов, одним блоком).'},
-                {code: '{{subtitlesFull}}', desc: 'Субтитры с разметкой времени (таймкоды в начале каждой строки).'},
-                {code: '{{title}}', desc: 'Название видео.'},
-                {code: '{{shortDescription}}', desc: 'Короткое описание видео.'},
-                {code: '{{publishDate}}', desc: 'Дата публикации.'},
-                {code: '{{lengthSeconds}}', desc: 'Длительность видео в секундах.'},
-                {code: '{{channelName}}', desc: 'Название канала.'},
-                {code: '{{category}}', desc: 'Категория на YouTube.'},
-                {code: '{{videoUrl}}', desc: 'Ссылка на видео.'},
-                {code: '{{thumbnailUrl}}', desc: 'Ссылка на изображение превью.'},
-                {code: '{{keywords}}', desc: 'Ключевые слова (список, через запятую).'},
-                {code: '{{videoData}}', desc: 'Все параметры видео списком вида "ключ: значение".'}
+                { code: '{{subtitlesText}}', desc: t('promptPlaceholderSubtitlesText') },
+                { code: '{{subtitlesFull}}', desc: t('promptPlaceholderSubtitlesFull') },
+                { code: '{{title}}', desc: t('promptPlaceholderTitle') },
+                { code: '{{shortDescription}}', desc: t('promptPlaceholderShortDescription') },
+                { code: '{{publishDate}}', desc: t('promptPlaceholderPublishDate') },
+                { code: '{{lengthSeconds}}', desc: t('promptPlaceholderLengthSeconds') },
+                { code: '{{channelName}}', desc: t('promptPlaceholderChannelName') },
+                { code: '{{category}}', desc: t('promptPlaceholderCategory') },
+                { code: '{{videoUrl}}', desc: t('promptPlaceholderVideoUrl') },
+                { code: '{{thumbnailUrl}}', desc: t('promptPlaceholderThumbnailUrl') },
+                { code: '{{keywords}}', desc: t('promptPlaceholderKeywords') },
+                { code: '{{videoData}}', desc: t('promptPlaceholderVideoData') }
             ].forEach(ph => {
                 const tr = document.createElement('tr');
                 const td1 = document.createElement('td');
@@ -2661,31 +3020,31 @@ A: [Ответ]
             const opHeader = document.createElement('b');
             opHeader.style.display = "block";
             opHeader.style.marginTop = "8px";
-            opHeader.textContent = 'Доступные операции для обработки значения:';
+            opHeader.textContent = t('promptOpHeader');
 
             const opTable = document.createElement('table');
             opTable.className = 'yts-doc-table';
 
             const trh = document.createElement('tr');
             const th1 = document.createElement('th');
-            th1.textContent = 'Операция';
+            th1.textContent = t('promptOpTh1');
             const th2 = document.createElement('th');
-            th2.textContent = 'Описание';
+            th2.textContent = t('promptOpTh2');
             trh.appendChild(th1);
             trh.appendChild(th2);
             opTable.appendChild(trh);
 
             [
-                ['replace(a,b)', 'замена всех вхождений "a" на "b" в строке'],
-                ['lower()', 'преобразовать в нижний регистр'],
-                ['upper()', 'преобразовать в верхний регистр'],
-                ['trim()', 'убрать пробелы по краям строки'],
-                ['capitalize()', 'первая буква заглавная, остальные маленькие'],
-                ['split(sep)', 'разбить строку на массив по разделителю'],
-                ['join(sep)', 'объединить массив строк в строку через разделитель'],
-                ['sort()', 'отсортировать массив'],
-                ['length()', 'длина строки или массива'],
-                ['slice(start,end)', 'получить часть строки или массива'],
+                ['replace(a,b)', t('promptOpReplace')],
+                ['lower()', t('promptOpLower')],
+                ['upper()', t('promptOpUpper')],
+                ['trim()', t('promptOpTrim')],
+                ['capitalize()', t('promptOpCapitalize')],
+                ['split(sep)', t('promptOpSplit')],
+                ['join(sep)', t('promptOpJoin')],
+                ['sort()', t('promptOpSort')],
+                ['length()', t('promptOpLength')],
+                ['slice(start,end)', t('promptOpSlice')]
             ].forEach(pair => {
                 const tr = document.createElement('tr');
                 const tdCode = document.createElement('td');
@@ -2698,7 +3057,7 @@ A: [Ответ]
             });
 
             const egHeader = document.createElement('b');
-            egHeader.textContent = 'Примеры использования:';
+            egHeader.textContent = t('promptEgHeader');
             egHeader.style.display = "block";
             egHeader.style.marginTop = "16px";
 
@@ -2707,20 +3066,20 @@ A: [Ответ]
 
             const eg_trh = document.createElement('tr');
             const eg_th1 = document.createElement('th');
-            eg_th1.textContent = 'Шаблон';
+            eg_th1.textContent = t('promptEgTh1');
             const eg_th2 = document.createElement('th');
-            eg_th2.textContent = 'Результат';
+            eg_th2.textContent = t('promptEgTh2');
             eg_trh.appendChild(eg_th1);
             eg_trh.appendChild(eg_th2);
             egTable.appendChild(eg_trh);
 
             [
-                {ex: '{{videoData:+title,publishDate}}', desc: 'только название видео и дата публикации'},
+                {ex: '{{videoData:+title,publishDate}}', desc: t('promptExVideoDataFields')},
                 {
                     ex: `{{keywords:split(","),sort(),slice(0,3),join(" / ")}}`,
-                    desc: 'три первых ключевых слова в алфавитном порядке'
+                    desc: t('promptExKeywordSort')
                 },
-                {ex: `{{title:replace(" ","_"),lower()}}`, desc: 'название видео, в нижнем регистре и без пробелов'}
+                {ex: `{{title:replace(" ","_"),lower()}}`, desc: t('promptExTitleFormat')}
             ].forEach(item => {
                 const tr = document.createElement('tr');
                 const tdEx = document.createElement('td');
@@ -2736,9 +3095,9 @@ A: [Ответ]
             note.style.marginTop = "16px";
             note.style.fontSize = "14px";
             let bTip = document.createElement('b');
-            bTip.textContent = 'Совет: ';
+            bTip.textContent = t('promptTip');
             note.appendChild(bTip);
-            note.appendChild(document.createTextNode('Используйте предпросмотр (👁️ в настройках промпта), чтобы увидеть, как данные подставляются в шаблон.'));
+            note.appendChild(document.createTextNode(t('promptPreviewNote')));
 
             instruction.appendChild(intro1);
             instruction.appendChild(instructionsList);
@@ -2789,11 +3148,11 @@ A: [Ответ]
                 }
             });
             closeBtn.className = 'modal-close';
-            closeBtn.title = 'Закрыть';
+            closeBtn.title = t('close');
 
             const title = document.createElement('div');
             title.className = 'modal-title';
-            title.textContent = 'Проверка промпта (реальные данные)';
+            title.textContent = t('testTitle');
 
             textarea = document.createElement('textarea');
             textarea.id = 'yts-preview-textarea';
@@ -2806,7 +3165,7 @@ A: [Ответ]
             textarea = q('#yts-preview-textarea', modal);
         }
 
-        textarea.value = 'Загрузка данных видео...';
+        textarea.value = t('textareaLoading');
         modal.style.display = 'block';
         textarea.focus();
 
@@ -2815,7 +3174,7 @@ A: [Ответ]
                 textarea.value = replacePromptVars(prompt, vd || {});
             })
             .catch(e => {
-                textarea.value = 'Ошибка получения данных:\n' + (e && e.message ? e.message : e);
+                textarea.value = t('textareaError') + (e && e.message ? e.message : e);
             });
     }
 
@@ -2872,18 +3231,18 @@ A: [Ответ]
                                   }) {
         // Базовая валидация — минимум 1 промпт, все поля промпта не пустые
         if (!Array.isArray(prompts) || prompts.length === 0) {
-            return {dirty: true, error: "Требуется минимум один промпт"};
+            return {dirty: true, error: t('minOnePrompt')};
         }
         log(`Prompts: ${JSON.stringify(prompts)}`);
         const someEmptyPrompt = prompts.some(p => !p.title.trim() || !p.prompt.trim());
         log(`Some empty prompt: ${someEmptyPrompt}`);
         if (someEmptyPrompt) {
-            return {dirty: true, error: "Все промпты должны иметь название и текст"};
+            return {dirty: true, error: t('allPromptsFilled')};
         }
 
         // Валидация URL
         if (!isValidURL(url)) {
-            return {dirty: true, error: "Некорректный URL"};
+            return {dirty: true, error: t('invalidUrl')};
         }
 
         // Сравнение с сохранёнными (без deepEqual, только по соответствию)
@@ -2935,7 +3294,7 @@ A: [Ответ]
         } else if (dirty) {
             messageInfo.style.display = "block";
             messageInfo.style.background = "#2f5b36";
-            messageInfo.textContent = "Есть несохранённые изменения";
+            messageInfo.textContent = t('unsavedChanges');
             saveBtn.style.background = "#2f5b36";
             saveBtn.style.color = "#fff";
             saveBtn.onmouseenter = function () {
@@ -2945,17 +3304,17 @@ A: [Ответ]
                 saveBtn.style.background = "#2f5b36";
             };
             saveBtn.disabled = false;
-            saveBtn.title = "Сохранить изменения";
+            saveBtn.title = t('saveChanges');
         } else {
             messageInfo.style.display = "none";
             messageInfo.style.background = "#4a4d4d";
-            messageInfo.textContent = "Нет изменений";
+            messageInfo.textContent = t('noChanges');
             saveBtn.style.background = "";
             saveBtn.style.color = "";
             saveBtn.onmouseenter = null;
             saveBtn.onmouseleave = null;
             saveBtn.disabled = true;
-            saveBtn.title = "Нет изменений";
+            saveBtn.title = t('noChanges');
         }
     }
 
@@ -3016,7 +3375,7 @@ A: [Ответ]
     function setSettingsForm({prompts, timeout, url, token, model}) {
         const promps = Array.isArray(prompts) && prompts.length
             ? prompts
-            : [...DEFAULT_PROMPTS];
+            : [...getDefaultPromptsForLang(initLanguage())];
         const block = q(`#${MODAL_ID} #prompt-list-block`);
         while (block.firstChild) block.removeChild(block.firstChild);
 
@@ -3024,7 +3383,7 @@ A: [Ответ]
         headerDiv.className = 'prompt-list-header';
 
         const headerTitle = document.createElement('div');
-        headerTitle.textContent = 'Промпты';
+        headerTitle.textContent = t('prompts');
         headerTitle.className = 'prompt-list-header-title';
         headerDiv.appendChild(headerTitle);
 
@@ -3042,13 +3401,13 @@ A: [Ответ]
         btnInfo.style.fontWeight = '700';
         btnInfo.style.fontSize = '18px';
         btnInfo.style.color = '#fff';
-        btnInfo.title = 'Справка по плейсхолдерам и промптам';
+        btnInfo.title = t('promptHelpBtn');
         headerBtns.appendChild(btnInfo);
 
         const btnAdd = document.createElement('button');
         btnAdd.type = 'button';
         btnAdd.className = 'prompt-btn add';
-        btnAdd.title = 'Добавить промпт';
+        btnAdd.title = t('addPrompt');
         btnAdd.textContent = '✚';
         btnAdd.onclick = function () {
             const rows = block.querySelectorAll('.prompt-block-row');
@@ -3116,7 +3475,7 @@ A: [Ответ]
 
         const inputTitle = document.createElement('input');
         inputTitle.type = "text";
-        inputTitle.placeholder = "Название действия";
+        inputTitle.placeholder = t('promptNamePlaceholder');
         inputTitle.value = pr.title || '';
         inputTitle.className = 'prompt-input-title';
         inputTitle.style.flex = '1 1 0%';
@@ -3131,14 +3490,14 @@ A: [Ответ]
         });
         btnCheck.type = 'button';
         btnCheck.className = 'prompt-btn check';
-        btnCheck.title = 'Показать итоговый промпт с подставленными реальными переменными';
+        btnCheck.title = t('previewPrompt');
         row1.appendChild(btnCheck);
 
         const btnDel = document.createElement('button');
         btnDel.type = 'button';
         btnDel.className = 'prompt-btn remove';
         btnDel.textContent = '✖';
-        btnDel.title = 'Удалить этот промпт';
+        btnDel.title = t('deletePrompt');
         btnDel.disabled = total <= 1;
         btnDel.onclick = function () {
             if (btnDel.disabled) return;
@@ -3158,7 +3517,7 @@ A: [Ответ]
 
         const inputPrompt = document.createElement('textarea');
         inputPrompt.className = 'prompt-input-prompt';
-        inputPrompt.placeholder = "Текст промпта";
+        inputPrompt.placeholder = t('promptTextPlaceholder');
         inputPrompt.rows = 2;
         inputPrompt.value = pr.prompt;
         inputPrompt.style.flex = '1 1 0%';
@@ -3294,7 +3653,7 @@ A: [Ответ]
                 }
                 contentDiv.scrollTop = contentDiv.scrollHeight;
             } else if (ytsPrintIsComplete) {
-                result_container.querySelector('.result-title').textContent = 'Готово';
+                result_container.querySelector('.result-title').textContent = t('done');
                 clearInterval(ytsPrintTimer);
                 ytsPrintTimer = null;
                 ytsPrintIsComplete = false;
@@ -3322,7 +3681,7 @@ A: [Ответ]
         const resp = await fetch(url, requestInit);
         if (!resp.body) {
             log('fetch: No streaming body supported by fetch', null, 'error');
-            throw new Error('Нет поддержки стриминга у fetch');
+            throw new Error(t('noStreamSupport'));
         }
         if (!resp.ok) {
             let errorMsg = `API error: HTTP status ${resp.status}`;
@@ -3364,7 +3723,7 @@ A: [Ответ]
                         d = JSON.parse(j);
                     } catch (err) {
                         log("Error parsing streaming data: not JSON", j, 'error');
-                        throw new Error("Ошибка парсинга потока - Некорректный JSON: " + j);
+                        throw new Error(t('invalidJson') + j);
                     }
                     if (d?.error?.message) {
                         log('API stream error field', d.error.message, 'error');
@@ -3606,7 +3965,7 @@ A: [Ответ]
                 prompt: prompt
             });
             let timeoutId = setTimeout(() => {
-                showError('Превышено время ожидания ответа от API (' + Math.floor(TIMEOUT / 1000) + ' секунд)');
+                showError(t('timeout') + Math.floor(TIMEOUT / 1000) + ' секунд)');
                 log('API request timed out', null, 'error');
                 reject(new Error('Timeout'));
             }, TIMEOUT);
@@ -3639,7 +3998,7 @@ A: [Ответ]
                     resolved = true;
                     clearTimeout(timeoutId);
                     log('Stream/LLM API error', err, 'error');
-                    showError(err.message || "Ошибка генерации ответа от LLM");
+                    showError(err.message || t('apiError'));
                     reject(err);
                 }
             }
@@ -3689,7 +4048,7 @@ A: [Ответ]
                 // noinspection JSUnusedGlobalSymbols
                 const summaryButton = createButton({
                     id: BTN_ID,
-                    text: getActivePrompt().title || 'Генерировать',
+                    text: getActivePrompt().title || t('generate'),
                     onClick: performPromptedAction,
                     onContextMenu: function (evt) {
                         evt.preventDefault();
@@ -3733,6 +4092,7 @@ A: [Ответ]
      * Вставка стилей, установка слушателей переходов, первичная отрисовка UI
      */
     function init() {
+        initLanguage();
         injectStyles();
         log('Styles injected');
         const navHandler = debounce(checkButton, 150);
