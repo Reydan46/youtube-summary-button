@@ -8,7 +8,7 @@
 // @icon           https://www.youtube.com/favicon.ico
 // @author         Reydan46
 // @namespace      yts
-// @version        0.9.0
+// @version        0.9.1
 // @homepageURL    https://github.com/Reydan46/youtube-summary-button
 // @supportURL     https://github.com/Reydan46/youtube-summary-button/issues
 // @updateURL      https://raw.githubusercontent.com/Reydan46/youtube-summary-button/main/yts.user.js
@@ -70,7 +70,6 @@
             timeoutTitle: 'Таймаут ответа (мс)',
             modelTitle: 'Модель:',
             saveChanges: 'Сохранить изменения',
-            noChanges: 'Нет изменений',
             generate: 'Генерировать',
 
             // Настройки
@@ -217,7 +216,6 @@
             timeoutTitle: 'Request timeout (ms)',
             modelTitle: 'Model:',
             saveChanges: 'Save changes',
-            noChanges: 'No changes',
             generate: 'Generate',
 
             // Settings
