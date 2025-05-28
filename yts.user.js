@@ -8,7 +8,7 @@
 // @icon           https://www.youtube.com/favicon.ico
 // @author         Reydan46
 // @namespace      yts
-// @version        0.9.1
+// @version        0.9.2
 // @homepageURL    https://github.com/Reydan46/youtube-summary-button
 // @supportURL     https://github.com/Reydan46/youtube-summary-button/issues
 // @updateURL      https://raw.githubusercontent.com/Reydan46/youtube-summary-button/main/yts.user.js
@@ -110,7 +110,7 @@
             exportSettings: 'Экспорт настроек',
             exportAll: 'Экспорт всего',
             import: 'Импорт',
-            
+
             // Документация промптов
             promptIntro:
                 'Промпт — это шаблон для LLM (ChatGPT/Claude и др.), где вы используете специальные переменные (плейсхолдеры) для подстановки реальных данных о видео: субтитров, заголовка, описания и других метаданных.',
@@ -120,7 +120,7 @@
             promptPlaceholderFormat2: '{{название}}',
             promptPlaceholderFormat3: ' — например, ',
             promptPlaceholderChain1:
-                 'Можно применять к плейсхолдерам цепочку операций через двоеточие: ',
+                'Можно применять к плейсхолдерам цепочку операций через двоеточие: ',
             promptPlaceholderChain2: '{{название:операция1(...),операция2(...)}}',
             promptPlaceholderChain3: ', все операции выполняются по порядку.',
             promptGroupPlaceholder1: 'Для сложных шаблонов используйте групповой плейсхолдер ',
@@ -463,10 +463,10 @@ A: [Ответ]
     ];
 
     const DEFAULT_PROMPTS_EN = [
-    {
-        id: 'summary',
-        title: "Brief summary",
-        prompt: `You are an assistant specialized in video content analysis. Analyze the provided subtitles and create a concise summary of the video's content.
+        {
+            id: 'summary',
+            title: "Brief summary",
+            prompt: `You are an assistant specialized in video content analysis. Analyze the provided subtitles and create a concise summary of the video's content.
 
 Your task is to capture the essence of each meaningful segment or section of the video, conveying the main ideas and events as succinctly as possible.
 For each block, use no more than one short sentence. Do not copy the subtitle text; rephrase the information in your own words.
@@ -476,11 +476,11 @@ Do not add any explanations, conclusions, introductions, or extra information be
 
 Use these subtitles:
 {{subtitlesText}}`
-    },
-    {
-        id: 'article',
-        title: "Article-outline",
-        prompt: `You are a video content analysis assistant. Analyze the provided subtitles from a technical video and generate a full article in markdown format using the information in the subtitles.
+        },
+        {
+            id: 'article',
+            title: "Article-outline",
+            prompt: `You are a video content analysis assistant. Analyze the provided subtitles from a technical video and generate a full article in markdown format using the information in the subtitles.
 
 Present the text as if it's a scientific/technical article, minimizing lists and using them only if an important enumeration is required.
 Avoid using phrases like "the author says" or similar in the article.
@@ -495,11 +495,11 @@ Try to minimize the amount of code blocks; use them only when necessary to maint
 
 Use these subtitles:
 {{subtitlesText}}`
-    },
-    {
-        id: 'moments',
-        title: "Key moments",
-        prompt: `You are an assistant for video content analysis. Please follow the instructions below:
+        },
+        {
+            id: 'moments',
+            title: "Key moments",
+            prompt: `You are an assistant for video content analysis. Please follow the instructions below:
 
 Analyze the provided subtitles and highlight only the most important moments (key events, plot twists, discoveries, conclusions, logical blocks) relevant for the viewer.
 For each moment, indicate only the original timestamp found at the beginning of the corresponding subtitle line exactly as it appears there (e.g., [00:10.12] or [00:15:09]).
@@ -518,11 +518,11 @@ and so on, each moment on a new line.
 
 Use these subtitles:
 {{subtitlesFull}}`
-    },
-    {
-        id: 'faq',
-        title: "Questions & Answers",
-        prompt: `You are a technical assistant.
+        },
+        {
+            id: 'faq',
+            title: "Questions & Answers",
+            prompt: `You are a technical assistant.
 Analyze the subtitles of a technical video and create a FAQ (questions and answers) on the main topics, using only the information present in the subtitles. 
 Each question and answer should be brief and to the point.
 Do not add anything beyond what is contained in the subtitles or make up information.
@@ -539,8 +539,8 @@ A: [Answer]
 
 Use these subtitles:
 {{subtitlesText}}`
-    }
-];
+        }
+    ];
 
     function getDefaultPromptsForLang(lang) {
         return lang === 'en' ? DEFAULT_PROMPTS_EN : DEFAULT_PROMPTS_RU;
@@ -2508,35 +2508,7 @@ Use these subtitles:
             return;
         }
 
-        // Собираем выбранные плейсхолдеры с описаниями
-        const selected = [];
-
-        // Кнопки
-        placeholdersContainer.querySelectorAll('button.placeholder-toggle.active').forEach(btn => {
-            selected.push({
-                key: btn.dataset.key,
-                label: btn.textContent.trim()
-            });
-        });
-
-        // Селектор субтитров
-        const subtitlesSelect = placeholdersContainer.querySelector('select');
-        if (subtitlesSelect && subtitlesSelect.value) {
-            const opt = subtitlesSelect.selectedOptions[0];
-            selected.push({
-                key: subtitlesSelect.value,
-                label: opt ? opt.textContent.trim() : subtitlesSelect.value
-            });
-        }
-
-        log('Used custom prompt placeholders', selected);
-
-        const activePlaceholders = selected.map(i => i.key);
-
-        const currentSettings = loadSettings();
-        currentSettings.customPromptText = customPrompt;
-        currentSettings.customPromptPlaceholders = activePlaceholders;
-        saveSettings(currentSettings);
+        const selected = handleSaveCustomPrompt(customPrompt, placeholdersContainer);
 
         modal.remove();
 
@@ -2553,6 +2525,7 @@ Use these subtitles:
         createOrUpdateResultContainer(true).then(() => {
             log('handleCustomPromptExecuteBtn: started loading video data for custom prompt');
             getVideoFullData().then(videoData => {
+                globalVideoData = videoData;
                 let fullPrompt = customPrompt;
                 if (selected.length > 0) {
                     fullPrompt += '\n\n';
@@ -2666,6 +2639,8 @@ Use these subtitles:
                     }
                     toggle.onclick = () => {
                         toggle.classList.toggle('active');
+                        const customPrompt = promptTextarea.value.trim();
+                        handleSaveCustomPrompt(customPrompt, placeholdersContainer);
                     };
                     placeholdersContainer.appendChild(toggle);
                 }
@@ -2756,7 +2731,14 @@ Use these subtitles:
             };
 
             promptTextarea.addEventListener('input', function () {
-                executeBtn.disabled = promptTextarea.value.trim() === '';
+                const customPrompt = promptTextarea.value.trim();
+
+                if (customPrompt === '') {
+                    executeBtn.disabled = true;
+                } else {
+                    executeBtn.disabled = false;
+                    handleSaveCustomPrompt(customPrompt, placeholdersContainer);
+                }
                 styleExecuteBtn();
             });
 
@@ -2780,6 +2762,47 @@ Use these subtitles:
 
         modal.style.display = 'block';
         modal.querySelector('textarea').focus();
+    }
+
+    /**
+     * Обработка сохранения пользовательского промпта
+     * @param {string} customPrompt Текст промпта
+     * @param {HTMLDivElement} placeholdersContainer Контейнер с выбранными плейсхолдерами
+     * @returns {Array} selected Массив выбранных плейсхолдеров
+     */
+    function handleSaveCustomPrompt(customPrompt, placeholdersContainer)
+    {
+        // Собираем выбранные плейсхолдеры с описаниями
+        const selected = [];
+
+        // Кнопки
+        placeholdersContainer.querySelectorAll('button.placeholder-toggle.active').forEach(btn => {
+            selected.push({
+                key: btn.dataset.key,
+                label: btn.textContent.trim()
+            });
+        });
+
+        // Селектор субтитров
+        const subtitlesSelect = placeholdersContainer.querySelector('select');
+        if (subtitlesSelect && subtitlesSelect.value) {
+            const opt = subtitlesSelect.selectedOptions[0];
+            selected.push({
+                key: subtitlesSelect.value,
+                label: opt ? opt.textContent.trim() : subtitlesSelect.value
+            });
+        }
+
+        const activePlaceholders = selected.map(i => i.key);
+
+        log('Used custom prompt placeholders', selected);
+
+        const currentSettings = loadSettings();
+        currentSettings.customPromptText = customPrompt;
+        currentSettings.customPromptPlaceholders = activePlaceholders;
+        saveSettings(currentSettings);
+
+        return selected;
     }
 
     /**
@@ -3405,15 +3428,17 @@ Use these subtitles:
                 }
                 let settings = loadSettings();
                 let newActive = settings.activePromptId;
-                if (!prompts.find(z => z.id === newActive)) newActive = prompts[0].id;
-                saveSettings({
-                    prompts,
-                    activePromptId: newActive,
-                    url: q('#yts-setting-url').value,
-                    timeout: Math.max(10000, parseInt(q('#yts-setting-timeout').value, 10) || DEFAULT_SETTINGS.timeout),
-                    model: q('#yts-setting-model').value || 'gpt-4.1-nano',
-                    token: q('#yts-setting-token').value
-                });
+                if (!prompts.find(z => z.id === newActive) && !(newActive === 'custom')) newActive = prompts[0].id;
+
+                const currentSettings = loadSettings();
+                currentSettings.prompts = prompts;
+                currentSettings.activePromptId = newActive;
+                currentSettings.url = q('#yts-setting-url').value;
+                currentSettings.timeout = Math.max(10000, parseInt(q('#yts-setting-timeout').value, 10)) || DEFAULT_SETTINGS.timeout;
+                currentSettings.model = q('#yts-setting-model').value || DEFAULT_SETTINGS.model;
+                currentSettings.token = q('#yts-setting-token').value;
+                saveSettings(currentSettings);
+
                 modal.style.display = 'none';
                 setTimeout(updateUIAfterPromptChange, 50);
             };
@@ -3552,18 +3577,18 @@ Use these subtitles:
             phTable.appendChild(ph_trh);
 
             [
-                { code: '{{subtitlesText}}', desc: t('promptPlaceholderSubtitlesText') },
-                { code: '{{subtitlesFull}}', desc: t('promptPlaceholderSubtitlesFull') },
-                { code: '{{title}}', desc: t('promptPlaceholderTitle') },
-                { code: '{{shortDescription}}', desc: t('promptPlaceholderShortDescription') },
-                { code: '{{publishDate}}', desc: t('promptPlaceholderPublishDate') },
-                { code: '{{lengthSeconds}}', desc: t('promptPlaceholderLengthSeconds') },
-                { code: '{{channelName}}', desc: t('promptPlaceholderChannelName') },
-                { code: '{{category}}', desc: t('promptPlaceholderCategory') },
-                { code: '{{videoUrl}}', desc: t('promptPlaceholderVideoUrl') },
-                { code: '{{thumbnailUrl}}', desc: t('promptPlaceholderThumbnailUrl') },
-                { code: '{{keywords}}', desc: t('promptPlaceholderKeywords') },
-                { code: '{{videoData}}', desc: t('promptPlaceholderVideoData') }
+                {code: '{{subtitlesText}}', desc: t('promptPlaceholderSubtitlesText')},
+                {code: '{{subtitlesFull}}', desc: t('promptPlaceholderSubtitlesFull')},
+                {code: '{{title}}', desc: t('promptPlaceholderTitle')},
+                {code: '{{shortDescription}}', desc: t('promptPlaceholderShortDescription')},
+                {code: '{{publishDate}}', desc: t('promptPlaceholderPublishDate')},
+                {code: '{{lengthSeconds}}', desc: t('promptPlaceholderLengthSeconds')},
+                {code: '{{channelName}}', desc: t('promptPlaceholderChannelName')},
+                {code: '{{category}}', desc: t('promptPlaceholderCategory')},
+                {code: '{{videoUrl}}', desc: t('promptPlaceholderVideoUrl')},
+                {code: '{{thumbnailUrl}}', desc: t('promptPlaceholderThumbnailUrl')},
+                {code: '{{keywords}}', desc: t('promptPlaceholderKeywords')},
+                {code: '{{videoData}}', desc: t('promptPlaceholderVideoData')}
             ].forEach(ph => {
                 const tr = document.createElement('tr');
                 const td1 = document.createElement('td');
