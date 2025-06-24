@@ -8,7 +8,7 @@
 // @icon           https://www.youtube.com/favicon.ico
 // @author         Reydan46
 // @namespace      yts
-// @version        0.9.2
+// @version        0.9.5
 // @homepageURL    https://github.com/Reydan46/youtube-summary-button
 // @supportURL     https://github.com/Reydan46/youtube-summary-button/issues
 // @updateURL      https://raw.githubusercontent.com/Reydan46/youtube-summary-button/main/yts.user.js
@@ -18,6 +18,7 @@
 // @grant          GM_info
 // @grant          GM_setValue
 // @grant          GM_getValue
+// @grant          unsafeWindow
 // @match          https://*.youtube.com/*
 // @connect        api.openai.com
 // @connect        raw.githubusercontent.com
@@ -45,11 +46,14 @@
     const PROMPT_PREVIEW_MODAL_ID = 'YTS_PromptPreviewModal';
     const PROMPT_DOC_MODAL_ID = 'YTS_PromptDocModal';
     const CUSTOM_PROMPT_MODAL_ID = 'YTS_CustomPromptModal';
+    const GOOG_API_KEY = 'AIzaSyDyT5W0Jh49F30Pqqtyfdf7pDLFKLJoAnw';
+    const PO_REQUEST_KEY = 'O43z0dpjhgX20SCx4KAo';
 
     let ytsPrintBuffer = [];
     let ytsPrintTimer = null;
     let ytsPrintIsComplete = false;
     let ytsErrorAlreadyShown = false;
+    let activeRequestController = null;
     let currentResult = "";
     let globalVideoData = {};
 
@@ -70,7 +74,7 @@
             timeoutTitle: 'Таймаут ответа (мс)',
             modelTitle: 'Модель:',
             saveChanges: 'Сохранить изменения',
-            generate: 'Генерировать',
+            cancel: 'Отменить',
 
             // Настройки
             prompts: 'Промпты',
@@ -216,7 +220,7 @@
             timeoutTitle: 'Request timeout (ms)',
             modelTitle: 'Model:',
             saveChanges: 'Save changes',
-            generate: 'Generate',
+            cancel: 'Cancel',
 
             // Settings
             prompts: 'Prompts',
@@ -1495,6 +1499,7 @@ Use these subtitles:
      */
     function initLanguage() {
         if (currentLang !== null) return currentLang;
+        // noinspection JSDeprecatedSymbols
         const browserLang = navigator.language || navigator.userLanguage;
         currentLang = browserLang.toLowerCase().startsWith('ru') ? 'ru' : 'en';
         log('Language initialized:', currentLang);
@@ -1944,7 +1949,7 @@ Use these subtitles:
      *
      * @param {object} args аргументы
      * @param {string} args.title Текст подсказки
-     * @param {string} args.icon SVG-иконка кнопки
+     * @param {object} args.icon SVG-иконка кнопки
      * @param {function} args.onClick Обработчик клика
      * @return {HTMLElement} DOM-элемент кнопки
      */
@@ -1967,7 +1972,7 @@ Use these subtitles:
                 const element = document.createElementNS("http://www.w3.org/2000/svg", el.type);
 
                 Object.entries(el.attrs).forEach(([key, value]) => {
-                    element.setAttribute(key, value);
+                    element.setAttribute(key, value.toString());
                 });
 
                 if (el.type === 'text' && el.text) {
@@ -2014,6 +2019,8 @@ Use these subtitles:
         error.textContent = errorMessage;
 
         container.appendChild(error);
+
+        updateButtonTitle(false);
     }
 
 
@@ -2094,7 +2101,8 @@ Use these subtitles:
      * @return {{subtitlesFull: string, subtitlesText: string}} Субтитры с таймкодами и только текст
      */
     function extractTextFromSubtitleXml(xmlString) {
-        const textMatches = xmlString.match(/<text[^>]*>(.*?)<\/text>/g);
+        xmlString = xmlString.replace(/\n/g, '');
+        const textMatches = xmlString.match(/<text[^>]*>[^<]*<\/text>/gm);
         if (!textMatches) {
             log('No subtitles <text> tags found in XML', null, 'error');
             return {
@@ -2223,7 +2231,246 @@ Use these subtitles:
     }
 
     /**
-     * Получить данные видео/субтитров через парсинг HTML страницы (без window.ytInitialPlayerResponse)
+     * Генерирует PO токен для видео с встроенным кешированием
+     *
+     * @param videoId ID видео
+     * @param visitorData Данные посетителя (опционально)
+     * @param forceNew Принудительно сгенерировать новый токен
+     * @return {Promise<string|null>} PO токен или null при ошибке
+     */
+    async function generatePOToken(videoId, visitorData = null, forceNew = false) {
+        // Инициализация кеша если его нет
+        window.YTS_PO_TOKEN_CACHE = window.YTS_PO_TOKEN_CACHE || {};
+
+        // Проверка кеша
+        if (!forceNew && window.YTS_PO_TOKEN_CACHE[videoId]) {
+            const cached = window.YTS_PO_TOKEN_CACHE[videoId];
+            const now = Date.now();
+
+            // Проверяем валидность токена (с запасом в 60 секунд)
+            if (now - cached.timestamp + 60000 < cached.ttl) {
+                log('Using cached PO token for video:', videoId);
+                return cached.token;
+            }
+
+            // Токен истек, удаляем из кеша
+            delete window.YTS_PO_TOKEN_CACHE[videoId];
+        }
+
+        log('Generating new PO token for video:', videoId);
+
+        const globalContext = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
+
+        log('Using global context:', typeof unsafeWindow !== 'undefined' ? 'unsafeWindow' : 'window');
+
+        // Используем переданные данные или ищем сами
+        if (!visitorData) {
+            log('Step 1: Getting visitor data...');
+            visitorData =
+                globalContext.ytcfg?.data_?.VISITOR_DATA ||
+                globalContext.yt?.config_?.VISITOR_DATA ||
+                globalContext.ytInitialPlayerResponse?.responseContext?.visitorData ||
+                document.cookie.match(/VISITOR_INFO1_LIVE=([^;]+)/)?.[1];
+
+            if (!visitorData) {
+                log('Visitor data not found', null, 'error');
+                return null;
+            }
+        }
+
+        log('Visitor data:', visitorData);
+
+        function base64ToU8(base64) {
+            const base64Mod = base64.replace(/[-_.]/g, m => ({'-': '+', '_': '/', '.': '='})[m]);
+            const binary = atob(base64Mod);
+            return new Uint8Array([...binary].map(char => char.charCodeAt(0)));
+        }
+
+        function u8ToBase64(u8, urlSafe = false) {
+            const result = btoa(String.fromCharCode(...u8));
+            return urlSafe ? result.replace(/\+/g, '-').replace(/\//g, '_') : result;
+        }
+
+        function descramble(scrambled) {
+            const buffer = base64ToU8(scrambled);
+            return buffer.length ? new TextDecoder().decode(buffer.map(b => b + 97)) : '';
+        }
+
+        try {
+            log('Step 2: Requesting challenge from Google...');
+            // Параллельно запускаем запрос челленджа
+            const challengePromise = fetch('https://jnn-pa.googleapis.com/$rpc/google.internal.waa.v1.Waa/Create', {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json+protobuf',
+                    'x-goog-api-key': GOOG_API_KEY,
+                    'x-user-agent': 'grpc-web-javascript/0.1'
+                },
+                body: JSON.stringify([PO_REQUEST_KEY])
+            }).then(r => r.json());
+
+            const challengeData = await challengePromise;
+            log('Challenge data:', challengeData);
+
+            log('Step 3: Parsing challenge data...');
+            // Парсинг данных челленджа
+            let parsedChallengeData;
+            if (challengeData.length > 1 && typeof challengeData[1] === 'string') {
+                const descrambled = descramble(challengeData[1]);
+                parsedChallengeData = JSON.parse(descrambled || '[]');
+            } else {
+                parsedChallengeData = challengeData[0];
+            }
+
+            const [messageId, wrappedScript, , interpreterHash, program, globalName] = parsedChallengeData;
+            log('Parsed challenge data:', {messageId, wrappedScript, interpreterHash, program, globalName});
+            const vmScript = Array.isArray(wrappedScript) ? wrappedScript.find(v => typeof v === 'string') : null;
+            log('Parsed VM script:', {vmScript});
+
+            log('Step 4: Loading BotGuard VM...');
+            // Загрузка VM
+            let vm = globalContext[globalName];
+
+            if (!vm) {
+                try {
+                    // Метод 1: Используем unsafeWindow.eval если доступен
+                    if (typeof unsafeWindow !== 'undefined') {
+                        log('Attempting 1: inject script via unsafeWindow.eval');
+                        try {
+                            unsafeWindow.eval(vmScript);
+                            vm = unsafeWindow[globalName];
+                        } catch (e) {
+                            log('Injection via unsafeWindow.eval failed:', e.message, 'warn');
+                        }
+                    }
+
+                    // Метод 2: Инжектим скрипт напрямую в страницу
+                    if (!vm) {
+                        log('Attempting 2: inject script into page');
+                        // Быстрая инъекция через текстовое содержимое
+                        const scriptEl = document.createElement('script');
+                        scriptEl.textContent = vmScript;
+                        (document.head || document.documentElement).appendChild(scriptEl);
+                        scriptEl.remove();
+                        vm = globalContext[globalName] || window[globalName];
+                    }
+                } catch (e) {
+                    log('Script injection failed:', e.message, 'error');
+                    throw new Error('Failed to load VM script: ' + e.message);
+                }
+            } else {
+                log('BotGuard VM already loaded');
+            }
+
+            // Небольшая задержка для инициализации
+            await new Promise(resolve => setTimeout(resolve, 200));
+
+            // Шаг 5: Инициализируем VM
+            log('Step 5: Initializing VM...');
+
+            if (!vm?.a) {
+                throw new Error('VM not found or invalid');
+            }
+
+            // Инициализация VM
+            const vmFuncs = {};
+            await vm.a(program, (a, s, p, c) => Object.assign(vmFuncs, {
+                asyncSnapshotFunction: a,
+                shutdownFunction: s,
+                passEventFunction: p,
+                checkCameraFunction: c
+            }), true, undefined, () => {
+            }, [[], []]);
+            log('VM initialized:', {vm});
+
+            log('Step 6: Creating BotGuard snapshot...');
+            log('Attempt 1: Standard method');
+            // Создание снапшота
+            const webPoSignalOutput = [];
+            let snapshotBotGuard = null;
+            const botguardResponse = await new Promise((resolve, reject) => {
+                const tid = setTimeout(() => reject(new Error('Snapshot timeout')), 5000);
+                vmFuncs.asyncSnapshotFunction(response => {
+                    clearTimeout(tid);
+                    resolve(response);
+                }, [undefined, undefined, webPoSignalOutput, undefined]);
+            });
+            if (!webPoSignalOutput.length) {
+                log('BotGuard snapshot not created');
+            }
+            else {
+                snapshotBotGuard = webPoSignalOutput[0];
+                log('BotGuard snapshot created:', {snapshotBotGuard});
+            }
+
+            // Проверка и альтернативный подход если пусто
+            if (!webPoSignalOutput.length) {
+                log('Attempt 2: Alt method');
+                await new Promise((resolve, reject) => {
+                    const tid = setTimeout(() => reject(new Error('Alt timeout')), 5000);
+                    vmFuncs.asyncSnapshotFunction(response => {
+                        clearTimeout(tid);
+                        resolve(response);
+                    }, [[], [], webPoSignalOutput, []]);
+                });
+
+                if (!webPoSignalOutput.length) {
+                    log('BotGuard snapshot not created');
+                }
+                else {
+                    snapshotBotGuard = webPoSignalOutput[0];
+                    log('BotGuard snapshot created:', {snapshotBotGuard});
+                }
+            }
+
+            if (!webPoSignalOutput.length) {
+                log('BotGuard snapshot not found');
+                throw new Error('BotGuard snapshot not found');
+            }
+
+            log('Step 7: Requesting integrity token...');
+            // Получение integrity токена
+            const integrityResponse = await fetch('https://jnn-pa.googleapis.com/$rpc/google.internal.waa.v1.Waa/GenerateIT', {
+                method: 'POST',
+                headers: {
+                    'content-type': 'application/json+protobuf',
+                    'x-goog-api-key': GOOG_API_KEY,
+                    'x-user-agent': 'grpc-web-javascript/0.1'
+                },
+                body: JSON.stringify([PO_REQUEST_KEY, botguardResponse])
+            });
+
+            const [integrityToken, ttlSecs] = await integrityResponse.json();
+            log('Integrity token received:', {integrityToken, ttlSecs});
+
+            log('Step 8: Creating WebPO token...');
+            if (!snapshotBotGuard || typeof snapshotBotGuard !== 'function') {
+                throw new Error('SnapshotBotGuard not found or not a function');
+            }
+            // Генерация PO токена
+            const snapshotBotGuardCallback = await snapshotBotGuard(base64ToU8(integrityToken));
+            const tokenBytes = await snapshotBotGuardCallback(new TextEncoder().encode(videoId));
+            const poToken = u8ToBase64(tokenBytes, true);
+
+            log('PO token:', poToken);
+
+            // Сохраняем в кеш
+            window.YTS_PO_TOKEN_CACHE[videoId] = {
+                token: poToken,
+                timestamp: Date.now(),
+                ttl: ttlSecs * 1000
+            };
+
+            return poToken;
+
+        } catch (error) {
+            log('PO token generation error:', error.message || error, 'error');
+            return null;
+        }
+    }
+
+    /**
+     * Получить данные видео/субтитров через парсинг HTML страницы
      *
      * @return {Promise<object>} Объект с данными видео, субтитров и дополнительной информацией
      */
@@ -2259,13 +2506,9 @@ Use these subtitles:
             extractTagAttribute('meta', 'name', 'keywords', 'content', html)
             || NOT_DEFINED;
 
-        const channelName = (() => {
-            const primary =
-                playerResponse?.videoDetails?.author
-                || playerResponse?.microformat?.playerMicroformatRenderer?.ownerChannelName;
-            if (primary) return primary;
-            return NOT_DEFINED;
-        })();
+        const channelName = playerResponse?.videoDetails?.author
+            || playerResponse?.microformat?.playerMicroformatRenderer?.ownerChannelName
+            || NOT_DEFINED;
 
         const publishDate = playerResponse.microformat?.playerMicroformatRenderer?.publishDate
             || playerResponse.microformat?.playerMicroformatRenderer?.uploadDate
@@ -2280,11 +2523,7 @@ Use these subtitles:
             if (!dur) return NOT_DEFINED;
 
             const m = dur.match(/PT(?:(\d+)M)?(?:(\d+)S)?/);
-            if (!m) return NOT_DEFINED;
-
-            const min = m[1] ? parseInt(m[1]) : 0;
-            const sec = m[2] ? parseInt(m[2]) : 0;
-            return (min * 60 + sec).toString();
+            return m ? ((parseInt(m[1] || 0) * 60 + parseInt(m[2] || 0)).toString()) : NOT_DEFINED;
         })();
 
         const category = playerResponse.microformat?.playerMicroformatRenderer?.category
@@ -2295,24 +2534,20 @@ Use these subtitles:
             const thumbnails = playerResponse?.videoDetails?.thumbnail?.thumbnails
                 || playerResponse?.microformat?.playerMicroformatRenderer?.thumbnail?.thumbnails
                 || [];
-            if (Array.isArray(thumbnails) && thumbnails.length > 0) {
-                return thumbnails[thumbnails.length - 1].url;
-            }
-            return extractTagAttribute('meta', 'property', 'og:image', 'content', html)
-                || NOT_DEFINED;
+            return thumbnails.length > 0
+                ? thumbnails[thumbnails.length - 1].url
+                : extractTagAttribute('meta', 'property', 'og:image', 'content', html) || NOT_DEFINED;
         })();
 
-        const episodes = extractEpisodes()
-            || NOT_DEFINED;
+        const episodes = extractEpisodes() || NOT_DEFINED;
 
         const captionTracks = (() => {
             const tracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
-            if (Array.isArray(tracks) && tracks.length > 0) {
-                return tracks;
-            }
+            if (tracks.length > 0) return tracks;
+
             const match = html.match(/"captionTracks":\s*\[(.*?)]/s);
             if (!match) {
-                log('No caption tracks found in HTML', null, 'error');
+                log('No caption tracks found', null, 'error');
                 throw new Error('Субтитры не найдены для этого видео');
             }
             try {
@@ -2324,18 +2559,37 @@ Use these subtitles:
         })();
 
         const langPref = ['ru', 'en'];
-        let captionTrack = langPref.map(lc => captionTracks.find(t => t.languageCode === lc))
+        const captionTrack = langPref.map(lc => captionTracks.find(t => t.languageCode === lc))
             .find(Boolean) || captionTracks[0];
 
         if (!captionTrack?.baseUrl) {
             log('No valid baseUrl for captions', {captionTrack}, 'error');
             throw new Error('Не удалось найти ссылку на субтитры');
         }
-        const subtitleUrl = captionTrack.baseUrl;
-        log('Fetching subtitles from', subtitleUrl);
 
+        const visitorData = playerResponse.responseContext?.visitorData || null;
+
+        let subtitleUrl = captionTrack.baseUrl;
+
+        // Генерируем PO токен, передавая visitorData если есть
+        const poToken = await generatePOToken(videoId, visitorData);
+
+        if (poToken) {
+            const urlObj = new URL(subtitleUrl);
+            urlObj.searchParams.set('pot', poToken);
+            urlObj.searchParams.set('potc', '1');
+            urlObj.searchParams.set('c', 'WEB');
+            subtitleUrl = urlObj.toString();
+            log('Subtitle URL updated with PO token');
+        } else {
+            log('Failed to get PO token, using original URL', null, 'warn');
+        }
+
+        log('Fetching subtitles from', subtitleUrl);
         const subtitleXml = await (await fetch(subtitleUrl)).text();
+        log('Received subtitles', {subtitleXml});
         const {subtitlesText, subtitlesFull} = extractTextFromSubtitleXml(subtitleXml);
+        log('Extracted subtitles text', {subtitlesText, subtitlesFull});
         if (!subtitlesText) {
             log('Failed to extract subtitles text', null, 'error');
             throw new Error(t('extractionError'));
@@ -2392,7 +2646,27 @@ Use these subtitles:
 
         const title = document.createElement('div');
         title.className = 'result-title';
-        title.textContent = loading ? t('processing') : t('done');
+        title.textContent = "YTS";
+
+        let timerSpan = null;
+        clearInterval(title.ytsTimerInterval);
+        title.ytsTimerInterval = null;
+        if (loading) {
+            timerSpan = document.createElement('span');
+            timerSpan.className = 'yts-gen-timer';
+            timerSpan.textContent = ' [ 00:00 ]';
+            title.appendChild(timerSpan);
+            let seconds = 0;
+
+            function pad(n) {
+                return n.toString().padStart(2, '0');
+            }
+
+            title.ytsTimerInterval = setInterval(() => {
+                seconds += 1;
+                timerSpan.textContent = ` [ ${pad(Math.floor(seconds / 60))}:${pad(seconds % 60)} ]`;
+            }, 1000);
+        }
         titleRow.appendChild(title);
         container.appendChild(titleRow);
 
@@ -2521,6 +2795,8 @@ Use these subtitles:
         ytsErrorAlreadyShown = false;
         currentResult = "";
 
+        updateButtonTitle(true);
+
         restoreResultContainer();
         createOrUpdateResultContainer(true).then(() => {
             log('handleCustomPromptExecuteBtn: started loading video data for custom prompt');
@@ -2538,10 +2814,12 @@ Use these subtitles:
                 log('handleCustomPromptExecuteBtn: sending to API', {usedPlaceholders: selected});
                 sendToAPI({...videoData, customPrompt: fullPrompt}).catch(error => {
                     showError(error.message || t('requestError'));
+                    updateButtonTitle(false);
                     log('handleCustomPromptExecuteBtn: sendToAPI error', error, 'error');
                 });
             }).catch(error => {
                 showError(error.message || t('requestError'));
+                updateButtonTitle(false);
                 log('handleCustomPromptExecuteBtn: getVideoFullData error', error, 'error');
             });
         });
@@ -2770,8 +3048,7 @@ Use these subtitles:
      * @param {HTMLDivElement} placeholdersContainer Контейнер с выбранными плейсхолдерами
      * @returns {Array} selected Массив выбранных плейсхолдеров
      */
-    function handleSaveCustomPrompt(customPrompt, placeholdersContainer)
-    {
+    function handleSaveCustomPrompt(customPrompt, placeholdersContainer) {
         // Собираем выбранные плейсхолдеры с описаниями
         const selected = [];
 
@@ -2846,15 +3123,50 @@ Use these subtitles:
     }
 
     /**
-     * Получить и обновить название кнопки
+     * Отменяет текущий запрос к API, если он активен
      */
-    function updateButtonTitle() {
-        const btn = q(`#${BTN_ID}`);
-        const active = getActivePrompt();
-        if (btn && active && btn.textContent !== active.title) {
-            btn.textContent = active.title || t('generate');
-            log('Button title updated', {title: btn.textContent});
+    function cancelActiveRequest() {
+        if (activeRequestController) {
+            log('Cancelling active request');
+            activeRequestController.abort();
+            activeRequestController = null;
+
+            updateButtonTitle();
+
+            const container = document.getElementById(RESULT_CONTAINER_ID);
+            if (container) {
+                const title = container.querySelector('.result-title');
+                if (title) title.textContent = t('done');
+            }
+
+            if (ytsPrintTimer) {
+                clearInterval(ytsPrintTimer);
+                ytsPrintTimer = null;
+            }
+            ytsPrintIsComplete = true;
         }
+    }
+
+    /**
+     * Обновляет название кнопки в зависимости от состояния генерации
+     *
+     * @param {boolean} isGenerating Флаг активной генерации
+     */
+    function updateButtonTitle(isGenerating = false) {
+        const btn = q(`#${BTN_ID}`);
+        if (!btn) return;
+
+        if (isGenerating) {
+            btn.textContent = t('cancel');
+            btn.dataset.generating = 'true';
+        } else {
+            const active = getActivePrompt();
+            if (active && btn.textContent !== active.title) {
+                btn.textContent = active.title;
+                btn.dataset.generating = 'false';
+            }
+        }
+        log('Button title updated', {text: btn.textContent, isGenerating});
     }
 
     /**
@@ -2911,7 +3223,6 @@ Use these subtitles:
             log('fetchLLMModels: invalid /v1/models response structure', data, 'error');
             throw new Error("Некорректный ответ от API /v1/models");
         }
-        // const ids = data.data.map(m => m.id);
         const ids = data.data.filter(m => m.owned_by !== "image").map(m => m.id);
         log('fetchLLMModels: models ids', ids);
         return ids;
@@ -4204,7 +4515,7 @@ Use these subtitles:
     }
 
     /**
-     * Потоковое обновление контента в результате
+     * Потоковое обновление контента в результате, управляет также таймером в заголовке
      *
      * @param {string} deltaText Текстовое обновление
      * @param {boolean} isComplete Флаг завершения
@@ -4238,7 +4549,12 @@ Use these subtitles:
                 }
                 contentDiv.scrollTop = contentDiv.scrollHeight;
             } else if (ytsPrintIsComplete) {
-                result_container.querySelector('.result-title').textContent = t('done');
+                const titleDiv = result_container.querySelector('.result-title');
+                if (titleDiv) {
+                    clearInterval(titleDiv.ytsTimerInterval);
+                    titleDiv.ytsTimerInterval = null;
+                    titleDiv.textContent = "YTS";
+                }
                 clearInterval(ytsPrintTimer);
                 ytsPrintTimer = null;
                 ytsPrintIsComplete = false;
@@ -4256,77 +4572,95 @@ Use these subtitles:
      * @return {Promise<void>} Промис для завершения передачи
      */
     async function streamFetchLLM(url, opts, onDelta) {
+        activeRequestController = new AbortController();
         const requestInit = {
             ...('method' in opts ? {method: opts.method} : {}),
             ...('headers' in opts ? {headers: opts.headers} : {}),
             ...('body' in opts ? {body: opts.body} : {}),
+            signal: activeRequestController.signal
         };
-
         log('Starting streaming fetch to LLM endpoint', {url, headers: requestInit.headers});
-        const resp = await fetch(url, requestInit);
-        if (!resp.body) {
-            log('fetch: No streaming body supported by fetch', null, 'error');
-            throw new Error(t('noStreamSupport'));
-        }
-        if (!resp.ok) {
-            let errorMsg = `API error: HTTP status ${resp.status}`;
-            try {
-                const text = await resp.text();
-                let info;
+        let thrownError = null;
+        try {
+            const resp = await fetch(url, requestInit);
+            if (!resp.body) {
+                log('fetch: No streaming body supported by fetch', null, 'error');
+                thrownError = new Error(t('noStreamSupport'));
+                return;
+            }
+            if (!resp.ok) {
+                let errorMsg = `API error: HTTP status ${resp.status}`;
                 try {
-                    info = JSON.parse(text);
+                    const text = await resp.text();
+                    let info;
+                    try {
+                        info = JSON.parse(text);
+                    } catch {
+                    }
+                    if (info?.error?.message) errorMsg = info.error.message;
+                    else if (typeof info?.detail === 'string') errorMsg = info.detail;
+                    else if (info?.detail?.error?.message) errorMsg = info.detail.error.message;
+                    else if (info?.detail) errorMsg = JSON.stringify(info.detail);
+                    else if (info) errorMsg = JSON.stringify(info);
+                    else if (text) errorMsg = text;
                 } catch {
                 }
-                if (info?.error?.message) errorMsg = info.error.message;
-                else if (typeof info?.detail === 'string') errorMsg = info.detail;
-                else if (info?.detail?.error?.message) errorMsg = info.detail.error.message;
-                else if (info?.detail) errorMsg = JSON.stringify(info.detail);
-                else if (info) errorMsg = JSON.stringify(info);
-                else if (text) errorMsg = text;
-            } catch {
+                thrownError = new Error(errorMsg);
+                return;
             }
-            throw new Error(errorMsg);
-        }
-        const reader = resp.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-        let buf = '';
-        while (true) {
-            const {done, value} = await reader.read();
-            if (done) break;
-            buf += decoder.decode(value, {stream: true});
-            let lineEnd;
-            while ((lineEnd = buf.indexOf('\n')) >= 0) {
-                const line = buf.slice(0, lineEnd).trim();
-                buf = buf.slice(lineEnd + 1);
-                if (!line) continue;
-                if (line.startsWith('data: ')) {
-                    const j = line.slice(6);
-                    if (j === '[DONE]') continue;
-                    let content = '';
-                    let d;
-                    try {
-                        d = JSON.parse(j);
-                    } catch (err) {
-                        log("Error parsing streaming data: not JSON", j, 'error');
-                        throw new Error(t('invalidJson') + j);
-                    }
-                    if (d?.error?.message) {
-                        log('API stream error field', d.error.message, 'error');
-                        throw new Error(d.error.message);
-                    }
-                    if (d?.detail) {
-                        log('API stream error detail', d.detail, 'error');
-                        throw new Error(typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail));
-                    }
-                    content = d.choices?.[0]?.delta?.content || '';
-                    if (content) {
-                        await onDelta(content, false);
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let buf = '';
+            while (true) {
+                const {done, value} = await reader.read();
+                if (done) break;
+                buf += decoder.decode(value, {stream: true});
+                let lineEnd;
+                while ((lineEnd = buf.indexOf('\n')) >= 0) {
+                    const line = buf.slice(0, lineEnd).trim();
+                    buf = buf.slice(lineEnd + 1);
+                    if (!line) continue;
+                    if (line.startsWith('data: ')) {
+                        const j = line.slice(6);
+                        if (j === '[DONE]') continue;
+                        let d;
+                        try {
+                            d = JSON.parse(j);
+                        } catch {
+                            log("Error parsing streaming data: not JSON", j, 'error');
+                            thrownError = new Error(t('invalidJson') + j);
+                            return;
+                        }
+                        if (d?.error?.message) {
+                            log('API stream error field', d.error.message, 'error');
+                            thrownError = new Error(d.error.message);
+                            return;
+                        }
+                        if (d?.detail) {
+                            log('API stream error detail', d.detail, 'error');
+                            thrownError = new Error(typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail));
+                            return;
+                        }
+                        const content = d.choices?.[0]?.delta?.content || '';
+                        if (content) {
+                            await onDelta(content, false);
+                        }
                     }
                 }
             }
+            await onDelta('', true);
+            log('Streaming fetch complete');
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                log('Request was aborted by user');
+                await onDelta('', true);
+            } else {
+                thrownError = error;
+            }
+        } finally {
+            activeRequestController = null;
         }
-        await onDelta('', true);
-        log('Streaming fetch complete');
+        if (thrownError) throw thrownError;
     }
 
     /**
@@ -4557,6 +4891,7 @@ Use these subtitles:
             let timeoutId = setTimeout(() => {
                 showError(t('timeout') + Math.floor(TIMEOUT / 1000) + ' секунд)');
                 log('API request timed out', null, 'error');
+                updateButtonTitle(false);
                 reject(new Error('Timeout'));
             }, TIMEOUT);
 
@@ -4579,6 +4914,7 @@ Use these subtitles:
                             resolved = true;
                             clearTimeout(timeoutId);
                             log('Streaming complete, all results received');
+                            updateButtonTitle(false);
                             resolve();
                         }
                     }
@@ -4589,6 +4925,7 @@ Use these subtitles:
                     clearTimeout(timeoutId);
                     log('Stream/LLM API error', err, 'error');
                     showError(err.message || t('apiError'));
+                    updateButtonTitle(false);
                     reject(err);
                 }
             }
@@ -4601,6 +4938,12 @@ Use these subtitles:
      * @return {Promise<void>} Промис
      */
     async function performPromptedAction() {
+        const btn = q(`#${BTN_ID}`);
+        if (btn && btn.dataset.generating === 'true') {
+            cancelActiveRequest();
+            return;
+        }
+
         const settings = loadSettings();
 
         // Если выбран кастомный промпт, показываем окно ввода
@@ -4620,6 +4963,8 @@ Use these subtitles:
         ytsErrorAlreadyShown = false;
         currentResult = "";
 
+        updateButtonTitle(true);
+
         restoreResultContainer();
         await createOrUpdateResultContainer(true);
         log('Prompt action: started streaming generation');
@@ -4630,6 +4975,7 @@ Use these subtitles:
         } catch (error) {
             log('Prompt action failed', error, 'error');
             showError(error.message || 'Ошибка при обработке запроса');
+            updateButtonTitle(false);
         }
     }
 
@@ -4646,7 +4992,7 @@ Use these subtitles:
                 // noinspection JSUnusedGlobalSymbols
                 const summaryButton = createButton({
                     id: BTN_ID,
-                    text: getActivePrompt().title || t('generate'),
+                    text: getActivePrompt().title,
                     onClick: performPromptedAction,
                     onContextMenu: function (evt) {
                         evt.preventDefault();
