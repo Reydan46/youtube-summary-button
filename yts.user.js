@@ -643,6 +643,10 @@ Use these subtitles:
                 color: #43ff71;
             }
 
+            ytd-watch-metadata[action-buttons-update-owner-width] #owner.ytd-watch-metadata {
+                max-width: 1000px !important;
+            }
+
             #${RESULT_CONTAINER_ID} .result-content {
                 font-size:14px;
                 line-height:1.4;
